@@ -1,15 +1,20 @@
-import './bootstrap.client'
+import {RemixBrowser} from '@remix-run/react'
 import * as React from 'react'
-import ReactDOM from 'react-dom'
-import {load} from 'fathom-client'
-import {RemixBrowser as Remix} from 'remix'
+import {hydrateRoot} from 'react-dom/client'
 
-ReactDOM.hydrate(<Remix />, document)
+if (ENV.MODE === 'production' && ENV.SENTRY_DSN) {
+  void import('./utils/monitoring.client.tsx').then(({init}) => init())
+}
 
-if (ENV.NODE_ENV !== 'development') {
-  load('HJUUDKMT', {
-    url: 'https://sailfish.kentcdodds.com/script.js',
-    spa: 'history',
-    excludedDomains: ['localhost'],
+function hydrate() {
+  React.startTransition(() => {
+    hydrateRoot(document, <RemixBrowser />)
   })
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+if (window.requestIdleCallback) {
+  window.requestIdleCallback(hydrate)
+} else {
+  window.setTimeout(hydrate, 1)
 }

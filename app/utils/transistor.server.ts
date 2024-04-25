@@ -1,21 +1,21 @@
+import slugify from '@sindresorhus/slugify'
 import * as uuid from 'uuid'
-import type {
-  TransistorErrorResponse,
-  TransistorCreateEpisodeData,
-  TransistorPublishedJson,
-  TransistorCreatedJson,
-  TransistorAuthorizedJson,
-  TransistorEpisodesJson,
-  CallKentEpisode,
-  TransistorUpdateEpisodeData,
-  Team,
-} from '~/types'
-import {getDomainUrl, getRequiredServerEnvVar, toBase64} from './misc'
-import {redisCache} from './redis.server'
-import {cachified} from './cache.server'
-import {getEpisodePath} from './call-kent'
-import {getDirectAvatarForUser} from './user-info.server'
-import {stripHtml} from './markdown.server'
+import {
+  type CallKentEpisode,
+  type TransistorAuthorizedJson,
+  type TransistorCreateEpisodeData,
+  type TransistorCreatedJson,
+  type TransistorEpisodesJson,
+  type TransistorErrorResponse,
+  type TransistorPublishedJson,
+  type TransistorUpdateEpisodeData,
+} from '~/types.ts'
+import {cache, cachified} from './cache.server.ts'
+import {getEpisodePath} from './call-kent.ts'
+import {stripHtml} from './markdown.server.ts'
+import {getRequiredServerEnvVar, toBase64} from './misc.tsx'
+import {type Timings} from './timing.server.ts'
+import {getDirectAvatarForUser} from './user-info.server.ts'
 
 const transistorApiSecret = getRequiredServerEnvVar('TRANSISTOR_API_SECRET')
 const podcastId = getRequiredServerEnvVar('CALL_KENT_PODCAST_ID', '67890')
@@ -43,7 +43,10 @@ async function fetchTransitor<JsonResponse>({
   }
   if (data) {
     config.body = JSON.stringify(data)
-    Object.assign(config.headers, {'Content-Type': 'application/json'})
+    config.headers = {
+      ...config.headers,
+      'Content-Type': 'application/json',
+    }
   }
   const res = await fetch(url.toString(), config)
   const json = await res.json()
@@ -70,7 +73,7 @@ async function createEpisode({
   summary: string
   description: string
   keywords: string
-  user: {firstName: string; email: string; team: Team}
+  user: {firstName: string; email: string; team: string}
   request: Request
   avatar?: string | null
 }) {
@@ -81,6 +84,10 @@ async function createEpisode({
   })
   const {upload_url, audio_url, content_type} = authorized.data.attributes
 
+  const episodesPerSeason = 50
+
+  const currentSeason = await getCurrentSeason()
+
   await fetch(upload_url, {
     method: 'PUT',
     body: audio,
@@ -90,10 +97,7 @@ async function createEpisode({
   const createData: TransistorCreateEpisodeData = {
     episode: {
       show_id: podcastId,
-      // IDEA: set the season automatically based on the year
-      // new Date().getFullYear() - 2020
-      // need to support multiple seasons in the UI first though.
-      season: 1,
+      season: currentSeason,
       audio_url,
       title,
       summary,
@@ -119,13 +123,23 @@ async function createEpisode({
     },
   })
 
+  const returnValue: {episodeUrl?: string; imageUrl?: string} = {}
   // set the alternate_url if we have enough info for it.
-  const {number, season} = created.data.attributes
+  const {number} = created.data.attributes
+  let season = currentSeason
+  let episodeNumber = 1
   if (typeof number === 'number' && typeof season === 'number') {
-    const {default: slugify} = await import('@sindresorhus/slugify')
+    //reset episode to 1 if it exceeds episodesPerSeason (50)
+    if (number > episodesPerSeason) {
+      season += 1
+      episodeNumber = 1
+    } else {
+      episodeNumber = number
+    }
+
     const slug = slugify(created.data.attributes.title)
     const episodePath = getEpisodePath({
-      episodeNumber: number,
+      episodeNumber,
       seasonNumber: season,
       slug,
     })
@@ -155,7 +169,8 @@ async function createEpisode({
     } else {
       const {hasGravatar, avatar} = await getDirectAvatarForUser(user, {
         size: 1400,
-        origin: getDomainUrl(request),
+        request,
+        forceFresh: true,
       })
       encodedAvatar = toBase64(avatar)
       radius = hasGravatar ? ',r_max' : ''
@@ -168,11 +183,22 @@ async function createEpisode({
     const nameYPosition = -textLines + 5.2
     const imageUrl = `https://res.cloudinary.com/kentcdodds-com/image/upload/$th_3000,$tw_3000,$gw_$tw_div_12,$gh_$th_div_12/w_$tw,h_$th,l_kentcdodds.com:social-background/co_white,c_fit,g_north_west,w_$gw_mul_6,h_$gh_mul_2.6,x_$gw_mul_0.8,y_$gh_mul_0.8,l_text:kentcdodds.com:Matter-Medium.woff2_180:${encodedTitle}/c_crop${radius},g_north_west,h_$gh_mul_5.5,w_$gh_mul_5.5,x_$gw_mul_0.8,y_$gh_mul_${avatarYPosition},l_fetch:${encodedAvatar}/co_rgb:a9adc1,c_fit,g_south_west,w_$gw_mul_8,h_$gh_mul_4,x_$gw_mul_0.8,y_$gh_mul_0.8,l_text:kentcdodds.com:Matter-Regular.woff2_120:${encodedUrl}/co_rgb:a9adc1,c_fit,g_south_west,w_$gw_mul_8,h_$gh_mul_4,x_$gw_mul_0.8,y_$gh_mul_${nameYPosition},l_text:kentcdodds.com:Matter-Regular.woff2_140:${encodedName}/c_fit,g_east,w_$gw_mul_11,h_$gh_mul_11,x_$gw,l_kentcdodds.com:illustrations:mic/c_fill,w_$tw,h_$th/kentcdodds.com/social-background.png`
 
+    // warm up the image on cloudinary
+    await fetch(imageUrl, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(2000),
+    }).catch(() => {})
+
+    returnValue.episodeUrl = `${domainUrl}${episodePath}`
+    returnValue.imageUrl = imageUrl
     const updateData: TransistorUpdateEpisodeData = {
       id: created.data.id,
       episode: {
-        alternate_url: `${domainUrl}${episodePath}`,
+        alternate_url: returnValue.episodeUrl,
         image_url: imageUrl,
+        description: `${description}\n\n<a href="${returnValue.episodeUrl}">${title}</a>`,
+        number: episodeNumber,
+        season,
       },
     }
 
@@ -185,10 +211,11 @@ async function createEpisode({
 
   // update the cache with the new episode
   await getCachedEpisodes({forceFresh: true})
+
+  return returnValue
 }
 
 async function getEpisodes() {
-  const {default: slugify} = await import('@sindresorhus/slugify')
   const transistorEpisodes = await fetchTransitor<TransistorEpisodesJson>({
     endpoint: `/v1/episodes`,
     query: {'pagination[per]': '5000'},
@@ -234,22 +261,39 @@ async function getEpisodes() {
   return episodes
 }
 
+async function getCurrentSeason() {
+  const episodesResponse = await fetchTransitor<TransistorEpisodesJson>({
+    endpoint: `/v1/episodes`,
+    query: {
+      'pagination[per]': '1',
+      order: 'desc',
+    },
+  })
+
+  const lastEpisode = episodesResponse.data[0]
+  return lastEpisode?.attributes.season
+}
+
 const episodesCacheKey = `transistor:episodes:${podcastId}`
 
 async function getCachedEpisodes({
   request,
   forceFresh,
+  timings,
 }: {
   request?: Request
   forceFresh?: boolean
+  timings?: Timings
 }) {
   return cachified({
-    cache: redisCache,
+    cache,
+    request,
+    timings,
     key: episodesCacheKey,
     getFreshValue: getEpisodes,
-    maxAge: 1000 * 60 * 60 * 24,
+    ttl: 1000 * 60 * 60 * 24,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
     forceFresh,
-    request,
     checkValue: (value: unknown) =>
       Array.isArray(value) &&
       value.every(

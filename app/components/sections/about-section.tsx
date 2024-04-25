@@ -1,8 +1,7 @@
-import * as React from 'react'
-import {getImgProps, images} from '~/images'
-import {H2, Paragraph} from '../typography'
-import {ArrowLink} from '../arrow-button'
-import {Grid} from '../grid'
+import {getImgProps, images} from '~/images.tsx'
+import {ArrowLink} from '../arrow-button.tsx'
+import {Grid} from '../grid.tsx'
+import {H2, Paragraph} from '../typography.tsx'
 
 function AboutSection() {
   return (
@@ -11,8 +10,9 @@ function AboutSection() {
         <div className="table-cell text-center align-middle">
           <div>
             <img
-              className="rounded-lg object-cover"
+              loading="lazy"
               {...getImgProps(images.kentSnowSports, {
+                className: 'rounded-lg object-cover w-full h-full',
                 widths: [300, 650, 1300, 1800, 2600],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -33,14 +33,10 @@ function AboutSection() {
 
       <div className="col-span-full flex flex-col justify-center lg:col-span-4 lg:col-start-8 lg:mt-0">
         <img
-          className="mt-20 w-auto self-start lg:mt-0"
           {...getImgProps(images.snowboard, {
+            className: 'mt-20 w-full h-full object-contain self-start lg:mt-0',
             widths: [300, 600, 850, 1600, 2550],
-            sizes: [
-              '(max-width: 1023px) 80vw',
-              '(min-width:1024px) and (max-width:1620px) 25vw',
-              '410px',
-            ],
+            sizes: ['(min-width:1024px) and (max-width:1620px) 25vw', '410px'],
           })}
         />
 

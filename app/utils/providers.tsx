@@ -1,7 +1,9 @@
+import {useMatches} from '@remix-run/react'
 import * as React from 'react'
-import {useMatches} from 'remix'
-import type {KCDHandle} from '~/types'
+import {type KCDHandle} from '~/types.ts'
 
+// This utility is handy, but in Remix apps these days you really shouldn't need
+// context all that much. Instead you can useOutletContext: https://reactrouter.com/en/main/hooks/use-outlet-context
 function createSimpleContext<ContextType>(name: string) {
   const defaultValue = Symbol(`Default ${name} context value`)
   const Context = React.createContext<ContextType | null | typeof defaultValue>(
@@ -41,6 +43,14 @@ const {
   useValue: useChatsEpisodeUIState,
 } = createSimpleContext<ChatsEpisodeUIState>('ChatsEpisodeUIState')
 
+type CallsEpisodeUIState = {
+  sortOrder: 'desc' | 'asc'
+}
+const {
+  Provider: CallsEpisodeUIStateProvider,
+  useValue: useCallsEpisodeUIState,
+} = createSimpleContext<CallsEpisodeUIState>('CallsEpisodeUIState')
+
 function useMatchLoaderData<LoaderData>(handleId: string) {
   const matches = useMatches()
   const match = matches.find(
@@ -62,6 +72,8 @@ export {
   createSimpleContext,
   ChatsEpisodeUIStateProvider,
   useChatsEpisodeUIState,
+  CallsEpisodeUIStateProvider,
+  useCallsEpisodeUIState,
   useMatchLoaderData,
   useOptionalMatchLoaderData,
 }

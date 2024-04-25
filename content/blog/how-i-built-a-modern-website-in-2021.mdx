@@ -47,6 +47,12 @@ can do for your learning and advancement as a software engineer by reading
 [Introducing the new kentcdodds.com](/blog/introducing-the-new-kentcdodds.com)
 first.
 
+<callout-info>
+  I've migrated from Postgres/Redis to SQLite. Read about that in the post [I
+  Migrated from a Postgres Cluster to Distributed SQLite with
+  LiteFS](/blog/i-migrated-from-a-postgres-cluster-to-distributed-sqlite-with-litefs).
+</callout-info>
+
 ## Context
 
 Before we get too far into this I want to make my one thing clear. If this was a
@@ -670,7 +676,7 @@ And now for the options:
   request has the query parameter of `?fresh` and the user has the role of
   `ADMIN` (so... just me) then `forceFresh` will default to `true`. This allows
   me to manually refresh the cache for all resources on any page. I don't need
-  to do this very often though. You can also provide a value of `,`-sparated
+  to do this very often though. You can also provide a value of `,`-separated
   cache key values to force only _those_ cache values to be refreshed.
 - `fallbackToCache` if we tried to `forceFresh` (so we skipped the cache) and
   getting the fresh value failed, then we might want to fallback to the cached
@@ -843,7 +849,7 @@ And oh, what if I wanted to also get all the posts this user has read? Do I need
 some graphql resolver magic? Nope! Check this out:
 
 ```ts
-const users = await prismaRead.user.findMany({
+const users = await prisma.user.findMany({
   select: {
     id: true,
     email: true,
@@ -876,10 +882,8 @@ Now _that's_ what I'm talking about! And with Remix, I can easily query directly
 in my `loader`, and then have that **typed** data available in my component:
 
 ```tsx
-type LoaderData = Await<ReturnType<typeof getLoaderData>>
-
-async function getLoaderData() {
-  const users = await prismaRead.user.findMany({
+export async function loader({request}: DataFunctionArgs) {
+  const users = await prisma.user.findMany({
     select: {
       id: true,
       email: true,
@@ -892,15 +896,11 @@ async function getLoaderData() {
       },
     },
   })
-  return {users}
-}
-
-export const loader: LoaderFunction = async ({request}) => {
-  return json(await getLoaderData())
+  return json({users})
 }
 
 export default function UsersPage() {
-  const data = useLoaderData<LoaderData>()
+  const data = useLoaderData<typeof loader>()
   return (
     <div>
       <h1>Users</h1>

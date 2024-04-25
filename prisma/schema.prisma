@@ -9,23 +9,12 @@
 // `npx prisma migrate dev --name <descriptive-name>` - generate a migration file for any changes you make to the schema (this will be committed).
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider        = "prisma-client-js"
-}
-
-enum Role {
-  ADMIN
-  MEMBER
-}
-
-enum Team {
-  BLUE
-  RED
-  YELLOW
+  provider = "prisma-client-js"
 }
 
 model User {
@@ -36,11 +25,13 @@ model User {
   firstName    String
   discordId    String?
   convertKitId String?
-  role         Role       @default(MEMBER)
-  team         Team
+  role         String     @default("MEMBER")
+  team         String
   calls        Call[]
   sessions     Session[]
   postReads    PostRead[]
+
+  @@index([team])
 }
 
 model Session {
@@ -70,4 +61,9 @@ model PostRead {
   userId    String?
   clientId  String?
   postSlug  String
+
+  @@index([userId, postSlug])
+  @@index([clientId, postSlug])
+  @@index([postSlug, createdAt])
+  @@index([createdAt, userId])
 }

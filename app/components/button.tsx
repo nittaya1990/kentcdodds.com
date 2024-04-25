@@ -1,10 +1,10 @@
-import clsx from 'clsx'
+import {clsx} from 'clsx'
 import * as React from 'react'
-import {AnchorOrLink} from '~/utils/misc'
+import {AnchorOrLink} from '~/utils/misc.tsx'
 
 interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger'
-  size?: 'medium' | 'large'
+  size?: 'small' | 'medium' | 'large'
   children: React.ReactNode | React.ReactNode[]
 }
 
@@ -18,7 +18,7 @@ function getClassName({className}: {className?: string}) {
 function ButtonInner({
   children,
   variant,
-  size,
+  size = 'large',
 }: Pick<ButtonProps, 'children' | 'variant' | 'size'>) {
   return (
     <>
@@ -41,8 +41,9 @@ function ButtonInner({
             'text-primary': variant === 'secondary',
             'text-inverse': variant === 'primary',
             'text-red-500': variant === 'danger',
-            'space-x-5 px-11 py-6': size !== 'medium',
+            'space-x-5 px-11 py-6': size === 'large',
             'space-x-3 px-8 py-4': size === 'medium',
+            'space-x-1 px-5 py-2 text-sm': size === 'small',
           },
         )}
       >
@@ -68,6 +69,9 @@ function Button({
   )
 }
 
+/**
+ * A button that looks like a link
+ */
 function LinkButton({
   className,
   underlined,
@@ -79,14 +83,18 @@ function LinkButton({
       className={clsx(
         className,
         underlined
-          ? 'underlined focus:outline-none whitespace-nowrap'
+          ? 'underlined whitespace-nowrap focus:outline-none'
           : 'underline',
-        'text-primary inline-block',
+        className?.includes('block') ? '' : 'inline-block',
+        'text-primary',
       )}
     />
   )
 }
 
+/**
+ * A link that looks like a button
+ */
 const ButtonLink = React.forwardRef<
   HTMLAnchorElement,
   React.ComponentPropsWithRef<typeof AnchorOrLink> & ButtonProps

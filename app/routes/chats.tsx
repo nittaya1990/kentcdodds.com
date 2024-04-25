@@ -1,50 +1,50 @@
-import * as React from 'react'
+import {Tab, TabList, TabPanel, TabPanels, Tabs} from '@reach/tabs'
 import {
   json,
+  type HeadersFunction,
+  type LoaderFunction,
+  type MetaFunction,
+} from '@remix-run/node'
+import {
+  Link,
+  Outlet,
   useLoaderData,
   useMatches,
-  Link,
-  MetaFunction,
-  Outlet,
   useNavigate,
-} from 'remix'
-import type {LoaderFunction, HeadersFunction} from 'remix'
-import clsx from 'clsx'
-import {Tab, TabList, TabPanel, TabPanels, Tabs} from '@reach/tabs'
-import type {LoaderData as RootLoaderData} from '../root'
-import type {Await, KCDHandle} from '~/types'
-import {ChatsEpisodeUIStateProvider} from '~/utils/providers'
-import {Grid} from '~/components/grid'
+} from '@remix-run/react'
+import {clsx} from 'clsx'
+import * as React from 'react'
+import {Grid} from '~/components/grid.tsx'
+import {ChevronDownIcon, ChevronUpIcon} from '~/components/icons.tsx'
+import {PodcastSubs} from '~/components/podcast-subs.tsx'
+import {BlogSection} from '~/components/sections/blog-section.tsx'
+import {FeaturedSection} from '~/components/sections/featured-section.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {Spacer} from '~/components/spacer.tsx'
+import {H4, H6, Paragraph} from '~/components/typography.tsx'
 import {
   getGenericSocialImage,
   getImageBuilder,
   getImgProps,
   images,
-} from '~/images'
-import {H4, H6, Paragraph} from '~/components/typography'
-import {externalLinks} from '../external-links'
-import {ChevronDownIcon} from '~/components/icons/chevron-down-icon'
-import {ChevronUpIcon} from '~/components/icons/chevron-up-icon'
-import {BlogSection} from '~/components/sections/blog-section'
-import {getBlogRecommendations} from '~/utils/blog.server'
-import {getSeasonListItems} from '~/utils/simplecast.server'
-import {FeaturedSection} from '~/components/sections/featured-section'
+} from '~/images.tsx'
+import {type Await} from '~/types.ts'
+import {getBlogRecommendations} from '~/utils/blog.server.ts'
+import {getCWKEpisodePath, getFeaturedEpisode} from '~/utils/chats-with-kent.ts'
 import {
-  listify,
-  formatTime,
-  reuseUsefulLoaderHeaders,
-  getUrl,
+  formatDuration,
   getDisplayUrl,
-} from '~/utils/misc'
-import {getCWKEpisodePath, getFeaturedEpisode} from '~/utils/chats-with-kent'
-import {HeroSection} from '~/components/sections/hero-section'
-import {Spacer} from '~/components/spacer'
-import {PodcastSubs} from '~/components/podcast-subs'
-import {getSocialMetas} from '~/utils/seo'
-
-export const handle: KCDHandle = {
-  restoreScroll: false,
-}
+  getOrigin,
+  getUrl,
+  listify,
+  reuseUsefulLoaderHeaders,
+} from '~/utils/misc.tsx'
+import {ChatsEpisodeUIStateProvider} from '~/utils/providers.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {getSeasonListItems} from '~/utils/simplecast.server.ts'
+import {getServerTimeHeader} from '~/utils/timing.server.ts'
+import {externalLinks} from '~/external-links.tsx'
+import {type RootLoaderType} from '~/root.tsx'
 
 type LoaderData = {
   seasons: Await<ReturnType<typeof getSeasonListItems>>
@@ -52,7 +52,8 @@ type LoaderData = {
 }
 
 export const loader: LoaderFunction = async ({request}) => {
-  const blogRecommendations = await getBlogRecommendations(request)
+  const timings = {}
+  const blogRecommendations = await getBlogRecommendations({request, timings})
   const data: LoaderData = {
     // we show the seasons in reverse order
     seasons: (await getSeasonListItems({request})).reverse(),
@@ -63,43 +64,42 @@ export const loader: LoaderFunction = async ({request}) => {
     headers: {
       'Cache-Control': 'private, max-age=3600',
       Vary: 'Cookie',
+      'Server-Timing': getServerTimeHeader(timings),
     },
   })
 }
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({data, parentsData}) => {
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  data,
+  matches,
+}) => {
   const {seasons} = (data as LoaderData | undefined) ?? {}
   if (!seasons) {
-    return {
-      title: 'Chats with Kent Seasons not found',
-    }
+    return [{title: 'Chats with Kent Seasons not found'}]
   }
   const episodeCount = seasons.reduce(
     (acc, season) => acc + season.episodes.length,
     0,
   )
-  const {requestInfo} = parentsData.root as RootLoaderData
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
 
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: 'Chats with Kent C. Dodds Podcast',
-      description: `Become a better person with ${episodeCount} interesting and actionable conversations with interesting people.`,
-      keywords: `chats with kent, kent c. dodds`,
-      url: getUrl(requestInfo),
-      image: getGenericSocialImage({
-        origin: requestInfo.origin,
-        words: 'Listen to the Chats with Kent Podcast',
-        featuredImage: images.kayak.id,
-        url: getDisplayUrl({
-          origin: requestInfo.origin,
-          path: '/chats',
-        }),
+  return getSocialMetas({
+    title: 'Chats with Kent C. Dodds Podcast',
+    description: `Become a better person with ${episodeCount} interesting and actionable conversations with interesting people.`,
+    keywords: `chats with kent, kent c. dodds`,
+    url: getUrl(requestInfo),
+    image: getGenericSocialImage({
+      words: 'Listen to the Chats with Kent Podcast',
+      featuredImage: images.kayak.id,
+      url: getDisplayUrl({
+        origin: getOrigin(requestInfo),
+        path: '/chats',
       }),
     }),
-  }
+  })
 }
 
 function PodcastHome() {
@@ -122,7 +122,9 @@ function PodcastHome() {
   function handleTabChange(index: number) {
     const chosenSeason = data.seasons[index]
     if (chosenSeason) {
-      navigate(String(chosenSeason.seasonNumber).padStart(2, '0'))
+      navigate(String(chosenSeason.seasonNumber).padStart(2, '0'), {
+        preventScrollReset: true,
+      })
     }
   }
 
@@ -145,32 +147,34 @@ function PodcastHome() {
 
         <PodcastSubs
           apple={externalLinks.applePodcast}
-          google={externalLinks.googlePodcast}
+          pocketCasts={externalLinks.pocketCasts}
           spotify={externalLinks.spotify}
           rss={externalLinks.simpleCast}
         />
       </Grid>
 
-      <Spacer size="xs" />
-
-      <FeaturedSection
-        cta="Listen to this episode"
-        caption="Featured episode"
-        subTitle={`Season ${featured.seasonNumber} Episode ${
-          featured.episodeNumber
-        } — ${formatTime(featured.duration)}`}
-        title={featured.title}
-        href={getCWKEpisodePath(featured)}
-        imageUrl={featured.image}
-        imageAlt={listify(featured.guests.map(g => g.name))}
-      />
+      {featured ? (
+        <>
+          <Spacer size="xs" />
+          <FeaturedSection
+            cta="Listen to this episode"
+            caption="Featured episode"
+            subTitle={`Season ${featured.seasonNumber} Episode ${
+              featured.episodeNumber
+            } — ${formatDuration(featured.duration)}`}
+            title={featured.title}
+            href={getCWKEpisodePath(featured)}
+            imageUrl={featured.image}
+            imageAlt={listify(featured.guests.map(g => g.name))}
+          />
+        </>
+      ) : null}
 
       <Spacer size="base" />
 
       <Grid>
         <div className="col-span-full lg:col-span-6">
           <img
-            className="rounded-lg object-cover"
             title="Photo by Jukka Aalho / Kertojan ääni: https://kertojanaani.fi"
             {...getImgProps(
               getImageBuilder(
@@ -178,6 +182,7 @@ function PodcastHome() {
                 'A SM7B Microphone',
               ),
               {
+                className: 'rounded-lg object-cover',
                 widths: [512, 650, 840, 1024, 1300, 1680, 2000, 2520],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -246,7 +251,7 @@ function PodcastHome() {
               // Because we have a link right under the tab, we'll keep this off
               // the tab "tree" and rely on focusing/activating the link.
               tabIndex={-1}
-              className="focus:outline-none border-none p-0 text-4xl leading-tight focus:bg-transparent"
+              className="border-none p-0 text-4xl leading-tight focus:bg-transparent focus:outline-none"
             >
               {/*
                 The link is here for progressive enhancement. Even though this
@@ -255,11 +260,12 @@ function PodcastHome() {
                 off, but more importantly it'll allow people to meta-click it.
               */}
               <Link
+                preventScrollReset
                 className={clsx(
                   'hover:text-primary focus:text-primary focus:outline-none',
                   {
                     'text-primary': season.seasonNumber === seasonNumber,
-                    'text-blueGray-500': season.seasonNumber !== seasonNumber,
+                    'text-slate-500': season.seasonNumber !== seasonNumber,
                   },
                 )}
                 to={String(season.seasonNumber).padStart(2, '0')}
@@ -289,7 +295,7 @@ function PodcastHome() {
             </H6>
 
             <button
-              className="group text-primary focus:outline-none relative text-lg font-medium"
+              className="text-primary group relative text-lg font-medium focus:outline-none"
               onClick={() => setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'))}
             >
               <div className="bg-secondary absolute -bottom-2 -left-4 -right-4 -top-2 rounded-lg opacity-0 transition group-hover:opacity-100 group-focus:opacity-100" />
@@ -314,7 +320,7 @@ function PodcastHome() {
           {data.seasons.map(season => (
             <TabPanel
               key={season.seasonNumber}
-              className="focus:outline-none border-t border-gray-200 dark:border-gray-600"
+              className="border-t border-gray-200 focus:outline-none dark:border-gray-600"
             >
               <ChatsEpisodeUIStateProvider value={{sortOrder}}>
                 <Outlet />

@@ -1,10 +1,11 @@
-import * as React from 'react'
-import clsx from 'clsx'
-import {Link, LinkProps} from 'remix'
-import {motion, useReducedMotion, Variant} from 'framer-motion'
-import {ArrowIcon, ArrowIconProps} from './icons/arrow-icon'
-import {H6} from './typography'
-import {ElementState, useElementState} from './hooks/use-element-state'
+import {Link, type LinkProps} from '@remix-run/react'
+import {clsx} from 'clsx'
+import {motion, useReducedMotion, type Variant} from 'framer-motion'
+import {useElementState, type ElementState} from './hooks/use-element-state.tsx'
+import {ArrowIcon} from './icons.tsx'
+import {H6} from './typography.tsx'
+
+type ArrowIconProps = React.ComponentProps<typeof ArrowIcon>
 
 const arrowVariants: Record<
   ArrowIconProps['direction'],
@@ -221,7 +222,7 @@ function BackLink({
     <MotionLink
       to={to}
       className={clsx(
-        'text-primary focus:outline-none flex space-x-4',
+        'text-primary flex space-x-4 focus:outline-none',
         className,
       )}
       ref={ref}

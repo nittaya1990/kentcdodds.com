@@ -41,8 +41,7 @@ keyTakeaways:
       number of those requests. And with control props, you'll be able to ditch
       the rest of them and rest easy.
 topics:
-  - Use the latest ref pattern to make your custom hooks easier to use
-  - Use composition to simplify layout components and avoid prop drilling
+  - Maintain referential equality with the latest ref pattern
   - Use the Compound Components Pattern to write React components that
     implicitly share state while giving rendering flexibility to the user
   - Handle common use cases for your hooks and components with the prop getter
@@ -51,9 +50,5 @@ topics:
   - Provide total logic control with the Controlled Props
 
 prerequisite: >-
-  Attend my [Advanced React Hooks Workshop](/workshops/advanced-react-hooks) or
-  have the equivalent experience. You should be experienced with `useContext`
-  and `useReducer` (experience with `useMemo` and `useCallback` is a bonus).
-  This workshop will use TypeScript, but should be completable if you do not
-  have experience with TypeScript (or you could attend my [TypeScript to know
-  for React](/workshops/typescript-to-know-for-react) workshop first).
+  You should be experienced with `useContext` and `useReducer` (experience with
+  `useMemo` and `useCallback` is a bonus).

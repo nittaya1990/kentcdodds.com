@@ -1,61 +1,371 @@
-- title: ThunderPlains 2022 Keynote
+- title: Stop Lying to your Users
   deliveries:
-    - event: '[ThunderPlains](https://thunderplainsconf.com/)'
-      date: 2022-10-28
+    - event: '[WebStep](https://webstep.se/)'
+      date: 2024-02-21
+    - event: '[React Miami 2024](https://www.reactmiami.com/)'
+      date: 2024-04-19
+  tags:
+    - meetup
+    - web
+    - performance
+  description: >-
+    Chances are your app is lying to your users. I know you don't mean it.
+    Building truthful apps is hard. But you've been lied to by so many other
+    apps you use and it is extremely frustrating. This frustration not only
+    makes everyone's day worse, but it also makes users get out of that app as
+    quickly as possible which for most apps is bad for the bottom line.
+
+
+    So what's the lie? Well you'll have to come to the talk to find out! Don't
+    worry though, I'll not only explain to you what the lie is, but I'll also
+    show you how to correct it and delight your users in a way that moves the
+    needle.
+
+- title: React India Keynote
+  deliveries:
+    - event: '[React India](https://www.reactindia.io/)'
+      date: 2024-10-18
   tags:
     - keynote
   description: >-
-    This talk is yet to be announced
+    This talk will be announced soon!
 
-- title: infoShare 2022 Keynote
+- title: React Native EU Keynote
   deliveries:
-    - event: '[infoShare](https://infoshare.pl/)'
-      date: 2022-10-06
+    - event: '[React Native EU](https://www.react-native.eu/)'
+      date: 2024-09-05
   tags:
     - keynote
   description: >-
-    This talk is yet to be announced
+    This talk will be announced soon!
 
-- title: React India 2022 Keynote
+- title: THAT Conf Wisconsin Keynote
+  deliveries:
+    - event:
+        '[THAT Conf Wisconsin](https://feature.thatconference.com/wi/2024/)'
+      date: 2024-07-29
+  tags:
+    - keynote
+  description: >-
+    This talk will be announced soon!
+
+- title: React Summit US Keynote
+  deliveries:
+    - event: '[React Summit 2024](https://reactsummit.us/)'
+      date: 2024-11-20
+  tags:
+    - keynote
+  description: >-
+    This talk will be announced soon!
+
+- title: And Now You Understand React Server Components
+  deliveries:
+    - event: '[React Conf](https://conf.react.dev/)'
+      date: 2024-05-16
+    - event: '[React Summit](https://reactsummit.com)'
+      date: 2024-06-14
+    - event: '[UtahJS Conf](https://utahjs.com/conference)'
+      date: 2024-09-13
+  tags:
+    - web
+  description: >-
+    You want to keep up with the future of React. React has evolved over the
+    years and continues to push the component model further and further. Out of
+    all the evolutions of React, server components are certainly the biggest
+    advancement. It expands the component model further than ever before and as
+    a result, requires some rethinking. Seasoned React developers need to
+    unlearn the way we used to do things to be able to understand the
+    improvements that React Server Components offer.
+
+
+    In this talk, Kent will guide you through React Server Components start to
+    finish so you can understand how React Server Components work and set you
+    off on your journey into the future of components everywhere!
+
+- title: What Makes the Web Epic
+  deliveries:
+    - event: '[Epic Web Conf](https://epicweb.dev/conf)'
+      date: 2024-04-11
+  tags:
+    - keynote
+    - web
+  description: >-
+    The web is a special platform. It's different from anything else you can
+    build on as a result of its openness and freedom from a central authority.
+    It's about collaboration and cooperation. As a result, there's a degree of
+    freedom we have on the web despite its weaknesses.
+
+
+    In this talk, I want to explain why you should double-down your investment
+    in web technologies in your own career and company offerings. If you do, we
+    can keep the web epic for many years to come.
+
+- title: React Router + Vite is a framework
+  resources:
+    - '[slides & demo](https://stackblitz.com/github/kentcdodds/viteconf-2023)'
+  deliveries:
+    - event: '[Vite Conf](https://viteconf.org/23/)'
+      date: 2023-10-05
+  tags:
+    - react
+    - vite
+    - react router
+  description: >-
+    I once [posted](https://twitter.com/kentcdodds/status/1678762503420153857):
+    "React Router + Vite is a framework". In this talk I'll explain what I mean.
+    We'll talk about a couple different ways you can define "framework" and
+    where the "React Router + Vite" combo fits in complete with an example you
+    can poke around at.
+
+- title: Making Felix Felicis
+  resources:
+    - '[slides](https://slides.com/kentcdodds/making-felix-felicis)'
+  deliveries:
+    - event: 'BYU Guest Lecture'
+      date: 2024-04-15
+    - event: '[JSDays Canarias](https://jsdaycanarias.com/)'
+      date: 2023-05-27
+  tags:
+    - keynote
+    - career
+  description: >-
+    Bring your wand and potions ingredients, because we're going to make liquid
+    luck! In my career, I've worked extremely hard, but I've also experienced a
+    lot of what some might call "luck." Some of what I've done is reproducible,
+    and some of it is not. But I've learned a lot about how to increase my "luck
+    surface area" and then make the most of the opportunities that come my way.
+    In this talk, I'll share the ingredients I've used to make my own luck, and
+    I hope it can help you make yours. Don't forget to bring your spell book!
+
+- title: Caching for Cash 🤑
+  resources:
+    - '[slides](https://slides.com/kentcdodds/caching-for-cash)'
+  deliveries:
+    - event: '[EpicWeb.dev special recording](https://www.epicweb.dev/talks)'
+      date: 2023-10-21
+      recording: https://www.epicweb.dev/talks/caching-for-cash
+    - event:
+        '[JS Fwdays Europe](https://fwdays.com/en/event/javascript-fwdays-2023)'
+      date: 2023-05-18
+      recording: https://www.youtube.com/watch?v=amflVh0CZ78&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[UtahJS Conf 2023](https://utahjs.com/conference)'
+      date: 2023-09-15
+  tags:
+    - caching
+    - remix
+    - web
+  description: >-
+    It's often said that the two hardest problems in programming are caching,
+    naming things, and off by one errors. Some degree of caching is required in
+    almost every application to drastically improve performance. Unfortunately,
+    not only is it easy to get wrong, there are also lots of different layers
+    and methods to implement caching with different trade-offs.
+
+
+    In this talk, Kent will explain the key principles of caching. We'll go
+    through several real world examples of issues where caching is a great
+    solution. We'll also explore different approaches and their associated
+    trade-offs. We'll cover a ton of ground here. This one's gonna be fun!
+
+- title: The Epic Stack
+  resources:
+    - '[slides](https://slides.com/kentcdodds/the-epic-stack)'
+  deliveries:
+    - event: '[Remix Conf 2023](https://remix.run/conf/2023)'
+      date: 2023-05-11
+      recording: https://www.youtube.com/watch?v=yMK5SVRASxM&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[React Summit US](https://reactsummit.us/)'
+      date: 2023-11-13
+    - event: '[React Live](https://reactlive.nl/)'
+      date: 2023-09-29
+    - event: '[DevsNorte](https://www.youtube.com/@DevsNorte)'
+      date: 2023-08-26
+      recording: https://www.youtube.com/watch?v=sr4xC7T4r08&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[EpicWeb.dev special recording](https://www.epicweb.dev/talks)'
+      date: 2021-10-24
+      recording: https://www.epicweb.dev/talks/the-epic-stack
+  tags:
+    - keynote
+    - web
+    - remix
+  description: >-
+    Modern web development is fantastic. There are so many great tools
+    available!
+
+
+    Modern web development is exhausting. There are so many great tools
+    available!
+
+
+    Each of these sentiments is true. What's great is that most of the time,
+    it's hard to make a choice that is wrong. Seriously. The trade-offs of most
+    of the frameworks and tools you could use to build your application fit
+    within the constraints of the vast majority of apps.
+
+
+    Despite this, engineers consistently struggle with analysis paralysis.
+
+
+    Let's talk about this, and a solution I am working on for it.
+
+- title: Full Stack Components
+  deliveries:
+    - event:
+        '[JS Fwdays Europe](https://fwdays.com/en/event/javascript-fwdays-2022)'
+      date: 2022-11-10
+      recording: https://www.youtube.com/watch?v=30HAT5Quvgk&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[Remix Conf Europe](https://remixconf.eu/)'
+      date: 2022-11-18
+      recording: https://www.youtube.com/watch?v=RszUDp_yiLI&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+  tags:
+    - remix
+  description: >-
+    Remix is a web framework that gives you the simple mental model of a
+    Multi-Page App (MPA) but the power and capabilities of a Single-Page App
+    (SPA). One of the big challenges of SPAs is network management resulting in
+    a great deal of indirection and buggy code. This is especially noticeable in
+    application state which Remix completely eliminates, but it's also an issue
+    in individual components that communicate with a single-purpose backend
+    endpoint (like a combobox search for example).
+
+
+    In this talk, Kent will demonstrate how Remix enables you to build complex
+    UI components that are connected to a backend in the simplest and most
+    powerful way you've ever seen. Leaving you time to chill with your family or
+    whatever else you do for fun 😎.
+
+- title: The Web's Next Transition
+  resources:
+    - '[slides and demo](https://github.com/kentcdodds/the-webs-next-transition)'
   deliveries:
     - event: '[React India](https://www.reactindia.io)'
       date: 2022-09-23
+    - event: '[infoShare](https://infoshare.pl/)'
+      date: 2022-10-06
+      recording: 'https://www.youtube.com/watch?v=NtJgclB-Ig8&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
+    - event: '[ThunderPlains](https://thunderplainsconf.com/)'
+      date: 2022-10-28
+    - event: '[All Things Open](https://www.allthingsopen.org/)'
+      date: 2022-11-01
+      recording: 'https://www.youtube.com/watch?v=5v5g0c9Wqkw&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
+    - event: '[Modern Frontends Live](https://www.modernfrontends.live/)'
+      date: 2022-11-17
+    - event: '[QCon London](https://qconlondon.com/)'
+      date: 2023-03-27
+    - event: '[React Miami 2023](https://reactmiami.com/)'
+      date: 2023-04-20
+      recording: 'https://www.youtube.com/watch?v=Ie7SJEzPtPo&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
+    - event: '[React Rally 2023](https://reactrally.com/)'
+      date: 2023-08-17
   tags:
     - keynote
+    - remix
+    - web
   description: >-
-    This talk is yet to be announced
+    The web. What started as a document sharing platform has evolved into an
+    application platform. The web has been through a number of transformations
+    over the years. From static HTML files to dynamic server-generated HTML
+    responses. Then to REST or GraphQL APIs consumed by JavaScript-heavy clients
+    with the Jamstack. The web is entering a completely new transformation.
+    Modern infrastructure and techniques have changed the rules of what it means
+    to make an excellent user experience. In this new future, what's old is new
+    and what's modern is lacking.
 
-- title: Infobip Shift 2022 Keynote
+
+    In this keynote, Kent C. Dodds will show you how this transformation will
+    impact your user experience, your development productivity, and your
+    business goals. The future of the web is distributed. It's faster. It's
+    cheaper. It's exciting. Kent will show you what you can do to stay in front
+    of it (and no, it's not web3).
+
+- title: Stream Away the Wait
+  resources:
+    - '[slides / demo](https://github.com/kentcdodds/stream-away-the-wait-talk)'
   deliveries:
-    - event: '[Infobip](https://shift.infobip.com/)'
-      date: 2022-09-19
+    - event: '[ReactNext](https://www.react-next.com/)'
+      date: 2022-06-28
+      recording: 'https://www.youtube.com/watch?v=gb2DGJB1ZsM&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
   tags:
     - keynote
+    - remix
   description: >-
-    This talk is yet to be announced
+    When implementing the design of a user interface, we often finish before
+    remembering that not everyone's running the app's services locally on their
+    device. There's going to be network latency, long running database queries,
+    and large datasets that can slow down the experience. We can and should do
+    everything we can to speed things up, but not all of this is within our
+    control. This means we need to start thinking about pending states. But
+    pending UI is terrible.
 
-- title: RenderATL Keynote
+
+    In this talk, Kent will walk us through building a pending experience that
+    is quite delightful. Ultimately taking advantage of React 18's new streaming
+    APIs and a soon-to-be-released API in Remix to give a top-notch user and
+    developer experience. Prepare to have your mind blown.
+
+- title: AHA Testing 💡
+  deliveries:
+    - event: '[Node TLV](https://www.nodetlv.com/)'
+      date: 2022-06-29
+      recording: https://www.youtube.com/watch?v=o5sLLYxRtko&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf&t=100s
+  tags:
+    - lightning
+    - testing
+  description: >-
+    There's a spectrum of abstraction and tests are no less important to
+    consider your abstractions than anything else. In this quick talk, we'll
+    look at what it takes to make sure you avoid hasty abstractions (AHA!).
+
+- title: Bringing Back Progressive Enhancement
+  resources:
+    - '[demo](https://github.com/kentcdodds/remix-todomvc)'
+    - '[slides](https://slides.com/kentcdodds/bringing-back-progressive-enhancement)'
   deliveries:
     - event: '[RenderATL](https://www.renderatl.com/)'
       date: 2022-06-01
+      recording: https://www.youtube.com/watch?v=EzLGleT1yrY&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[Infobip](https://shift.infobip.com/)'
+      date: 2022-09-19
+      recording: https://www.youtube.com/watch?v=kTg98AcjQN4&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[Agent Conf](https://www.alpine-conferences.com/agent-conf-2023)'
+      date: 2023-02-23
+      recording: https://www.youtube.com/watch?v=yyF00dOqxic&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[CityJS Conf London](https://london.cityjsconf.org/)'
+      date: 2023-03-31
+      recording: https://www.youtube.com/watch?v=HlQxQsVvxT0&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+    - event: '[GofiGeeks](https://www.meetup.com/gofigeeks/events/293401323/)'
+      date: 2023-05-29
+      recording: https://www.youtube.com/watch?v=HxdmGOAGH80&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
   tags:
     - keynote
+    - remix
+    - react
+    - html
+    - progressive enhancement
   description: >-
-    This talk is yet to be announced
+    One fun (sometimes frustrating) part of the web is that your application
+    must run on countless variations of devices with different configurations,
+    screen sizes, and capabilities. Over the years, technology has improved and
+    we've been given some really awesome APIs to _enhance_ our applications to
+    make them more useful despite the uniquely challenging (and awesome)
+    distribution mechanism of the web.
 
-- title: Remix Conf Keynote
-  deliveries:
-    - event: '[Remix Conf](https://remix.run/conf)'
-      date: 2022-05-25
-  tags:
-    - keynote
-  description: >-
-    This talk is yet to be announced
+
+    Unfortunately, when we use these new features of the web platform to
+    _enable_ our application, we limit our application's usefulness to the
+    trade-offs of those features which has surprisingly negative impacts (even
+    if the device itself supports those features).
+
+
+    In this talk, we're going to learn the true scope of Progressive Enhancement
+    and what can be gained by using tools and techniques that allow features of
+    the web to _enhance_ your user's experience rather than _enable_ it.
 
 - title: Shipping to the Edge
   deliveries:
-    - event: '[Reactathon](https://www.reactathon.com/)'
+    - event: '[Reactathon](https://reactathon.com)'
       date: 2022-05-02
+      recording: https://youtube.com/watch?v=osSaUWlgAyo&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
   tags:
     - keynote
   description: >-
@@ -63,6 +373,7 @@
     published to the World Wide Web in 1991. Over the years, the pendulum has
     swung from servers rendering HTML to JavaScript-heavy clients and now it's
     swinging toward something more in the middle.
+
 
     What about the web today is enabling us to overcome the shortcomings of the
     web of the past? In this talk, we'll get a little peak into the history of
@@ -73,16 +384,36 @@
   deliveries:
     - event: '[React Miami](https://www.reactmiami.com/)'
       date: 2022-04-19
+      recording: https://www.youtube.com/watch?v=AI-5dHnnyiA&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
   tags:
     - keynote
   description: >-
-    More details coming soon
+    When a brilliant idea strikes, you want to hit the ground running and focus
+    on building out your idea. Unfortunately, for any ambitious project, it
+    takes a significant amount of time configuring the tools you'll ultimately
+    need to make your idea a reality. Far too often we either under prepare and
+    our MVP-shortcuts end up being a pain in the neck for the next few years if
+    we're successful, or we spend so much time in the setup process that we lose
+    all motivation.
+
+
+    In this talk, I'll show you how Remix can help you get started with a solid
+    foundation so you can focus on building out your ideas. And when your MVP
+    turns into a money maker, you won't feel like you have to rewrite your app
+    from scratch! And for those of you starting new projects from scratch on a
+    regular basis, I'll show you how you can make your own Remix stack to create
+    these projects just like you want them again and again.
 
 - title: Server-side Auth with Remix, Prisma, and the Web Platform
   deliveries:
     - event: '[Node Congress](https://nodecongress.com/)'
       date: 2022-02-17
+      recording: https://portal.gitnation.org/contents/server-side-auth-with-remix-prisma-and-the-web-platform
+    - event: '[Node TLV](https://www.nodetlv.com/)'
+      date: 2022-06-29
+      recording: https://www.youtube.com/watch?v=OK-AGnsOo5U&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
   tags:
+    - keynote
     - remix
     - prisma
   description: >-
@@ -166,14 +497,33 @@
         '[JavaScript
         Marathon](https://labs.thisdot.co/resources/Remix-with-Kent-C-Dodds)'
       date: 2022-03-14
+      recording: 'https://youtube.com/watch?v=cEngdGLw5qM&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
     - event: '[CharlestonJS](https://www.meetup.com/nl-NL/CharlestonJS/events/283033703)'
       date: 2022-03-17
+    - event:
+        '[Remix Bay
+        Area](https://www.meetup.com/remix-bay-area/events/283836050)'
+      date: 2022-03-22
+      recording: 'https://www.youtube.com/watch?v=Cwwr9yFBHnA&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
     - event:
         '[Applitools
         webinar](https://applitools.com/excellent-ux-with-remix-webinar)'
       date: 2022-03-23
+      recording: 'https://youtube.com/watch?v=xl-8VgF8wH4&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf'
+    - event: 'Austin Software Tech Talk'
+      date: 2022-03-23
+    - event:
+        '[Shop Apotheke Technology
+        Summit](https://shop-apotheke-technology-summit.com/)'
+      date: 2022-03-31
     - event: '[Brum.js](https://brum.js.org)'
       date: 2022-03-31
+    - event: 'Tesla Frontend Meetup'
+      date: 2022-04-01
+    - event: 'Code for Ukraine Tech Beetup #3'
+      date: 2022-04-13
+    - event: 'Cox Communications Meetup'
+      date: 2022-08-17
 
 - title: The Power of Forms
   resources:
@@ -218,9 +568,6 @@
     - event: '[Utah JS Conf](https://utahjs.com/)'
       date: 2021-10-08
       recording: https://www.youtube.com/watch?v=owOZMwNPAyc&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
-    - event:
-        '[Agent Conf 2022](https://www.alpine-conferences.com/agent-conf-2022/)'
-      date: 2022-01-27
   tags:
     - keynote
     - react
@@ -236,11 +583,21 @@
     of the problems I faced and decisions I had to make while building a brand
     new modern website in 2021.
 
-- title: 'How React Uses Closures to Avoid Bugs'
+- title: Super Simple Start to Remix
   deliveries:
     - event: '[Connect.tech](https://connect.tech/)'
       date: 2021-11-08
-  description: TBA
+      recording: https://www.youtube.com/watch?v=zyz4PR6RG0U&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
+  description: >-
+    Remix has me more excited about building better websites than anything else
+    since I started using React back in 2015. I have so much to say about it,
+    but for this blog post, we're going to remove as many distractions as
+    possible and give remix the "super simple start" treatment. So, even though
+    Remix has a fancy npm init remix thing you can run (which is much easier
+    than what I'm going to show you), we're going to skip that and build a
+    simple remix app from absolutely nothing to running so we can inspect each
+    bit required to get it going.
+
 - title: Don't Solve Problems, Eliminate Them
   resources:
     - '[blog
@@ -250,6 +607,9 @@
     - career
     - software
   deliveries:
+    - event: '[EpicWeb.dev special recording](https://www.epicweb.dev/talks)'
+      date: 2021-11-01
+      recording: https://www.epicweb.dev/talks/dont-solve-problems-eliminate-them
     - event: '[Shift Dev Conf 2021](https://shift.infobip.com/)'
       date: 2021-09-07
       recording: https://www.youtube.com/watch?v=EETYrR8TOoc&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
@@ -258,6 +618,7 @@
       recording: https://www.youtube.com/watch?v=SMJKUHNrPng&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
     - event: '[Connect.tech](https://connect.tech/)'
       date: 2021-11-08
+      recording: https://www.youtube.com/watch?v=yE_PlrvF4OA&list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
   description: >-
     Humans are natural problem solvers and we're good enough at it that we've
     survived over the centuries and become the dominant species of the planet.
@@ -350,9 +711,6 @@
     need it.
 
 - title: Building the Open Source Community We Want
-  resources:
-    - "[slides](https://drive.google.com/open?id=1-kpw_RlWNjzGcV4E69KlsOktbCru6\
-      LFx)"
   tags:
     - open source
   deliveries:
@@ -761,6 +1119,7 @@
   deliveries:
     - event: '[UtahJS Conf](https://conf.utahjs.com)'
       date: 2018-09-14
+      recording: https://youtu.be/SAIdyBFHfVU?list=PLV5CVI1eNcJgNqzNwcs4UKrlJdhfDjshf
     - event:
         '[UtahJS SLC Meetup](https://www.meetup.com/UtahJS/events/245220227)'
       date: 2017-12-19

@@ -1,46 +1,54 @@
+import {
+  json,
+  type HeadersFunction,
+  type LoaderFunction,
+  type MetaFunction,
+} from '@remix-run/node'
+import {
+  Link,
+  Outlet,
+  useLoaderData,
+  useMatches,
+  useNavigate,
+} from '@remix-run/react'
+import {clsx} from 'clsx'
 import * as React from 'react'
-import type {LoaderFunction, HeadersFunction, MetaFunction} from 'remix'
-import {json, Link, useLoaderData, useMatches, Outlet} from 'remix'
-import {AnimatePresence, motion, useReducedMotion} from 'framer-motion'
-import clsx from 'clsx'
-import type {LoaderData as RootLoaderData} from '../root'
-import type {Await, CallKentEpisode, KCDHandle} from '~/types'
-import {externalLinks} from '~/external-links'
-import {getEpisodes} from '~/utils/transistor.server'
-import {useMatchLoaderData} from '~/utils/providers'
-import {HeroSection} from '~/components/sections/hero-section'
+import {ButtonLink} from '~/components/button.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {ChevronDownIcon, ChevronUpIcon} from '~/components/icons.tsx'
+import {PodcastSubs} from '~/components/podcast-subs.tsx'
+import {BlogSection} from '~/components/sections/blog-section.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {Spacer} from '~/components/spacer.tsx'
+import {H4, H6, Paragraph} from '~/components/typography.tsx'
+import {externalLinks} from '~/external-links.tsx'
 import {
   getGenericSocialImage,
   getImageBuilder,
   getImgProps,
   images,
-} from '~/images'
-import {ButtonLink} from '~/components/button'
-import {Grid} from '~/components/grid'
-import {getBlogRecommendations} from '~/utils/blog.server'
-import {BlogSection} from '~/components/sections/blog-section'
-import {H4, H6, Paragraph} from '~/components/typography'
-import {ChevronUpIcon} from '~/components/icons/chevron-up-icon'
-import {ChevronDownIcon} from '~/components/icons/chevron-down-icon'
-import {TriangleIcon} from '~/components/icons/triangle-icon'
+} from '~/images.tsx'
+import {type CallKentSeason, type Await, type KCDHandle} from '~/types.ts'
+import {getBlogRecommendations} from '~/utils/blog.server.ts'
 import {
-  formatTime,
   getDisplayUrl,
+  getOrigin,
   getUrl,
   reuseUsefulLoaderHeaders,
-} from '~/utils/misc'
+} from '~/utils/misc.tsx'
 import {
-  getEpisodeFromParams,
-  getEpisodePath,
-  Params as CallPlayerParams,
-} from '~/utils/call-kent'
-import {PodcastSubs} from '~/components/podcast-subs'
-import {Spacer} from '~/components/spacer'
-import {getSocialMetas} from '~/utils/seo'
+  CallsEpisodeUIStateProvider,
+  useMatchLoaderData,
+} from '~/utils/providers.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {getServerTimeHeader} from '~/utils/timing.server.ts'
+import {getEpisodes} from '~/utils/transistor.server.ts'
+import {type RootLoaderType} from '~/root.tsx'
+import {Tab, TabList, TabPanel, TabPanels, Tabs} from '@reach/tabs'
+import {groupBy} from '~/utils/cjs/lodash.js'
 
 export const handle: KCDHandle & {id: string} = {
   id: 'calls',
-  restoreScroll: false,
 }
 
 export type LoaderData = {
@@ -48,11 +56,34 @@ export type LoaderData = {
   blogRecommendations: Await<ReturnType<typeof getBlogRecommendations>>
 }
 
+export const getEpisodesBySeason = (
+  episodes: Await<ReturnType<typeof getEpisodes>>,
+) => {
+  const groupedEpisodeBySeasons = groupBy(episodes, 'seasonNumber')
+  const seasons: Array<CallKentSeason> = []
+  Object.entries(groupedEpisodeBySeasons).forEach(([key, value]) => {
+    seasons.push({
+      seasonNumber: +key,
+      episodes: value,
+    })
+  })
+  return seasons
+}
+
 export const loader: LoaderFunction = async ({request}) => {
+  const timings = {}
   const [blogRecommendations, episodes] = await Promise.all([
-    getBlogRecommendations(request),
-    getEpisodes({request}),
+    getBlogRecommendations({request, timings}),
+    getEpisodes({request, timings}),
   ])
+
+  const seasons = getEpisodesBySeason(episodes)
+
+  const seasonNumber = seasons[seasons.length - 1]?.seasonNumber ?? 1
+  const season = seasons.find(s => s.seasonNumber === seasonNumber)
+  if (!season) {
+    throw new Error(`oh no. season for ${seasonNumber}`)
+  }
 
   const data: LoaderData = {
     blogRecommendations,
@@ -62,73 +93,81 @@ export const loader: LoaderFunction = async ({request}) => {
     headers: {
       'Cache-Control': 'private, max-age=3600',
       Vary: 'Cookie',
+      'Server-Timing': getServerTimeHeader(timings),
     },
   })
 }
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: 'Call Kent Podcast',
-      description: `Leave Kent an audio message here, then your message and Kent's response are published in the podcast.`,
-      keywords: 'podcast, call kent, call kent c. dodds, the call kent podcast',
-      url: getUrl(requestInfo),
-      image: getGenericSocialImage({
-        origin: requestInfo.origin,
-        words: 'Listen to the Call Kent Podcast and make your own call.',
-        featuredImage: images.microphone({
-          // if we don't do this resize, the narrow microphone appears on the
-          // far right of the social image
-          resize: {
-            type: 'pad',
-            width: 1200,
-            height: 1200,
-          },
-        }),
-        url: getDisplayUrl({
-          origin: requestInfo.origin,
-          path: '/calls',
-        }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  return getSocialMetas({
+    title: 'Call Kent Podcast',
+    description: `Leave Kent an audio message here, then your message and Kent's response are published in the podcast.`,
+    keywords: 'podcast, call kent, call kent c. dodds, the call kent podcast',
+    url: getUrl(requestInfo),
+    image: getGenericSocialImage({
+      words: 'Listen to the Call Kent Podcast and make your own call.',
+      featuredImage: images.microphone({
+        // if we don't do this resize, the narrow microphone appears on the
+        // far right of the social image
+        resize: {
+          type: 'pad',
+          width: 1200,
+          height: 1200,
+        },
+      }),
+      url: getDisplayUrl({
+        origin: getOrigin(requestInfo),
+        path: '/calls',
       }),
     }),
-  }
+  })
 }
 
 export default function CallHomeScreen() {
-  const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
-  const shouldReduceMotion = useReducedMotion()
+  const [sortOrder, setSortOrder] = React.useState<'desc' | 'asc'>('desc')
 
   const data = useLoaderData<LoaderData>()
+  const navigate = useNavigate()
 
-  const sortedEpisodes =
-    sortOrder === 'desc' ? [...data.episodes].reverse() : data.episodes
+  const groupedEpisodeBySeasons = groupBy(data.episodes, 'seasonNumber')
+  const seasons: Array<CallKentSeason> = []
+  Object.entries(groupedEpisodeBySeasons).forEach(([key, value]) => {
+    seasons.push({
+      seasonNumber: +key,
+      episodes: value,
+    })
+  })
+
+  //show latest season first.
+  seasons.reverse()
 
   const matches = useMatches()
-  const callPlayerMatch = matches.find(
-    match => (match.handle as KCDHandle | undefined)?.id === 'call-player',
-  )
-  let selectedEpisode: CallKentEpisode | undefined
-  if (callPlayerMatch) {
-    const callPlayerParams = callPlayerMatch.params as CallPlayerParams
-    selectedEpisode = getEpisodeFromParams(sortedEpisodes, callPlayerParams)
+  const last = matches[matches.length - 1]
+
+  const seasonNumber = last?.params.season
+    ? Number(last.params.season)
+    : // we use the first one because the seasons are in reverse order
+      // oh, and this should never happen anyway because we redirect
+      // in the event there's no season param. But it's just to be safe.
+      seasons[0]?.seasonNumber ?? 1
+
+  const currentSeason = seasons.find(s => s.seasonNumber === seasonNumber)
+  const tabIndex = currentSeason ? seasons.indexOf(currentSeason) : 0
+
+  function handleTabChange(index: number) {
+    const chosenSeason = seasons[index]
+    if (chosenSeason) {
+      navigate(String(chosenSeason.seasonNumber).padStart(2, '0'), {
+        preventScrollReset: true,
+      })
+    }
   }
-  const initialSelectedEpisode = React.useRef(selectedEpisode)
-
-  // An effect to scroll to the episode's position when opening a direct link,
-  // use a ref so that it doesn't hijack scroll when the user is browsing episodes
-  React.useEffect(() => {
-    if (!initialSelectedEpisode.current) return
-    const href = getEpisodePath(initialSelectedEpisode.current)
-    document.querySelector(`[href="${href}"]`)?.scrollIntoView()
-  }, [])
-
-  // used to automatically prefix numbers with the correct amount of zeros
-  let numberLength = sortedEpisodes.length.toString().length
-  if (numberLength < 2) numberLength = 2
 
   return (
     <>
@@ -152,7 +191,7 @@ export default function CallHomeScreen() {
 
         <PodcastSubs
           apple={externalLinks.callKentApple}
-          google={externalLinks.callKentGoogle}
+          pocketCasts={externalLinks.callKentPocketCasts}
           spotify={externalLinks.callKentSpotify}
           rss={externalLinks.callKentRSS}
         />
@@ -163,7 +202,6 @@ export default function CallHomeScreen() {
       <Grid>
         <div className="col-span-full lg:col-span-6">
           <img
-            className="w-full rounded-lg object-cover"
             title="Photo by Luke Southern"
             {...getImgProps(
               getImageBuilder(
@@ -171,6 +209,7 @@ export default function CallHomeScreen() {
                 'Phone sitting on a stool',
               ),
               {
+                className: 'w-full rounded-lg object-cover',
                 widths: [512, 650, 840, 1024, 1300, 1680, 2000, 2520],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -213,127 +252,90 @@ export default function CallHomeScreen() {
 
       <Spacer size="base" />
 
-      {/*
-        IDEA: when there will be many episodes, we could split this by year, and
-        display it with tabs like on the podcast page. [2023, 2022, 2021]
-      */}
-      <Grid as="main">
-        <div className="col-span-full mb-6 flex flex-col lg:mb-12 lg:flex-row lg:justify-between">
-          <H6
-            id="episodes"
-            as="h2"
-            className="col-span-full mb-10 flex flex-col lg:mb-0 lg:flex-row"
-          >
-            {`Calls with Kent C. Dodds — ${data.episodes.length} episodes`}
-          </H6>
-
-          <button
-            className="group text-primary focus:outline-none relative text-lg font-medium"
-            onClick={() => setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'))}
-          >
-            <div className="bg-secondary absolute -bottom-2 -left-4 -right-4 -top-2 rounded-lg opacity-0 transition group-hover:opacity-100 group-focus:opacity-100" />
-            <span className="relative inline-flex items-center">
-              {sortOrder === 'asc' ? (
-                <>
-                  Showing oldest first
-                  <ChevronUpIcon className="ml-2 text-gray-400" />
-                </>
-              ) : (
-                <>
-                  Showing newest first
-                  <ChevronDownIcon className="ml-2 text-gray-400" />
-                </>
-              )}
-            </span>
-          </button>
-        </div>
-
-        <div className="col-span-full">
-          {sortedEpisodes.map(episode => {
-            const path = getEpisodePath(episode)
-
-            return (
-              <div
-                className="border-b border-gray-200 dark:border-gray-600"
-                key={path}
+      <Tabs
+        as={Grid}
+        className="mb-24 lg:mb-64"
+        index={tabIndex}
+        onChange={handleTabChange}
+      >
+        <TabList className="col-span-full mb-20 flex flex-col items-start bg-transparent lg:flex-row lg:space-x-12">
+          {seasons.map(season => (
+            <Tab
+              key={season.seasonNumber}
+              tabIndex={-1}
+              className="border-none p-0 text-4xl leading-tight focus:bg-transparent focus:outline-none"
+            >
+              <Link
+                preventScrollReset
+                className={clsx(
+                  'hover:text-primary focus:text-primary focus:outline-none',
+                  {
+                    'text-primary': season.seasonNumber === seasonNumber,
+                    'text-slate-500': season.seasonNumber !== seasonNumber,
+                  },
+                )}
+                to={String(season.seasonNumber).padStart(2, '0')}
+                onClick={e => {
+                  if (e.metaKey) {
+                    e.stopPropagation()
+                  } else {
+                    e.preventDefault()
+                  }
+                }}
               >
-                <Link to={path} className="group focus:outline-none">
-                  <Grid nested className="relative py-10 lg:py-5">
-                    <div className="bg-secondary absolute -inset-px -mx-6 hidden rounded-lg group-hover:block group-focus:block" />
-                    <div className="relative col-span-1 flex-none">
-                      <div className="absolute inset-0 flex scale-0 transform items-center justify-center opacity-0 transition group-hover:scale-100 group-hover:opacity-100 group-focus:scale-100 group-focus:opacity-100">
-                        <div className="flex-none rounded-full bg-white p-4 text-gray-800">
-                          <TriangleIcon size={12} />
-                        </div>
-                      </div>
-                      <img
-                        className="h-16 w-full rounded-lg object-cover"
-                        src={episode.imageUrl}
-                        alt="" // this is decorative only
-                      />
-                    </div>
-                    <div className="text-primary relative col-span-3 flex flex-col md:col-span-7 lg:col-span-11 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="mb-3 text-xl font-medium lg:mb-0">
-                        {/* For most optimal display, this will needs adjustment once you'll hit 5 digits */}
-                        <span
-                          className={clsx('inline-block lg:text-lg', {
-                            'w-10': numberLength <= 3,
-                            'w-14': numberLength === 4,
-                            'w-auto pr-4': numberLength > 4,
-                          })}
-                        >
-                          {`${episode.episodeNumber
-                            .toString()
-                            .padStart(2, '0')}.`}
-                        </span>
+                {`Season ${season.seasonNumber}`}
+              </Link>
+            </Tab>
+          ))}
+        </TabList>
 
-                        {episode.title}
-                      </div>
-                      <div className="text-lg font-medium text-gray-400">
-                        {formatTime(episode.duration)}
-                      </div>
-                    </div>
-                  </Grid>
-                </Link>
+        {currentSeason ? (
+          <div className="col-span-full mb-6 flex flex-col lg:mb-12 lg:flex-row lg:justify-between">
+            <H6
+              id="episodes"
+              as="h2"
+              className="col-span-full mb-10 flex flex-col lg:mb-0 lg:flex-row"
+            >
+              <span>Calls with Kent C. Dodds</span>
+              &nbsp;
+              <span>{`Season ${currentSeason.seasonNumber} — ${currentSeason.episodes.length} episodes`}</span>
+            </H6>
 
-                <Grid nested>
-                  <AnimatePresence>
-                    {selectedEpisode === episode ? (
-                      <motion.div
-                        variants={{
-                          collapsed: {
-                            height: 0,
-                            marginTop: 0,
-                            marginBottom: 0,
-                            opacity: 0,
-                          },
-                          expanded: {
-                            height: 'auto',
-                            marginTop: '1rem',
-                            marginBottom: '3rem',
-                            opacity: 1,
-                          },
-                        }}
-                        initial="collapsed"
-                        animate="expanded"
-                        exit="collapsed"
-                        transition={
-                          shouldReduceMotion ? {duration: 0} : {duration: 0.15}
-                        }
-                        className="relative col-span-full"
-                      >
-                        <Outlet />
-                      </motion.div>
-                    ) : null}
-                  </AnimatePresence>
-                </Grid>
-              </div>
-            )
-          })}
-        </div>
-      </Grid>
+            <button
+              className="text-primary group relative text-lg font-medium focus:outline-none"
+              onClick={() => setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'))}
+            >
+              <div className="bg-secondary absolute -bottom-2 -left-4 -right-4 -top-2 rounded-lg opacity-0 transition group-hover:opacity-100 group-focus:opacity-100" />
+              <span className="relative inline-flex items-center">
+                {sortOrder === 'asc' ? (
+                  <>
+                    Showing oldest first
+                    <ChevronUpIcon className="ml-2 text-gray-400" />
+                  </>
+                ) : (
+                  <>
+                    Showing newest first
+                    <ChevronDownIcon className="ml-2 text-gray-400" />
+                  </>
+                )}
+              </span>
+            </button>
+          </div>
+        ) : null}
 
-      <Spacer size="base" />
+        <TabPanels className="col-span-full">
+          {seasons.map(season => (
+            <TabPanel
+              key={season.seasonNumber}
+              className="border-t border-gray-200 focus:outline-none dark:border-gray-600"
+            >
+              <CallsEpisodeUIStateProvider value={{sortOrder}}>
+                <Outlet />
+              </CallsEpisodeUIStateProvider>
+            </TabPanel>
+          ))}
+        </TabPanels>
+      </Tabs>
 
       <BlogSection
         articles={data.blogRecommendations}

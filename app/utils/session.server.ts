@@ -1,17 +1,18 @@
-import {createCookieSessionStorage, redirect} from 'remix'
-import type {User} from '@prisma/client'
-import {sendMagicLinkEmail} from './send-email.server'
+import {type User} from '@prisma/client'
+import {createCookieSessionStorage, redirect} from '@remix-run/node'
+import {ensurePrimary} from '~/utils/cjs/litefs-js.server.js'
+import {getLoginInfoSession} from './login.server.ts'
+import {getRequiredServerEnvVar} from './misc.tsx'
 import {
-  getUserByEmail,
+  createSession,
   getMagicLink,
   getUserFromSessionId,
-  prismaWrite,
-  validateMagicLink,
-  createSession,
+  prisma,
   sessionExpirationTime,
-} from './prisma.server'
-import {getRequiredServerEnvVar} from './misc'
-import {getLoginInfoSession} from './login.server'
+  validateMagicLink,
+} from './prisma.server.ts'
+import {sendMagicLinkEmail} from './send-email.server.ts'
+import {type Timings} from './timing.server.ts'
 
 const sessionIdKey = '__session_id__'
 
@@ -40,10 +41,12 @@ async function sendToken({
     domainUrl,
   })
 
-  const user = await getUserByEmail(emailAddress).catch(() => {
-    /* ignore... */
-    return null
-  })
+  const user = await prisma.user
+    .findUnique({where: {email: emailAddress}})
+    .catch(() => {
+      /* ignore... */
+      return null
+    })
 
   await sendMagicLinkEmail({
     emailAddress,
@@ -66,11 +69,11 @@ async function getSession(request: Request) {
   }
   return {
     session,
-    getUser: async () => {
+    getUser: async ({timings}: {timings?: Timings} = {}) => {
       const token = getSessionId()
       if (!token) return null
 
-      return getUserFromSessionId(token).catch((error: unknown) => {
+      return getUserFromSessionId(token, {timings}).catch((error: unknown) => {
         unsetSessionId()
         console.error(`Failure getting user from session ID:`, error)
         return null
@@ -82,11 +85,12 @@ async function getSession(request: Request) {
       const userSession = await createSession({userId: user.id})
       session.set(sessionIdKey, userSession.id)
     },
-    signOut: () => {
+    signOut: async () => {
       const sessionId = getSessionId()
       if (sessionId) {
+        await ensurePrimary()
         unsetSessionId()
-        prismaWrite.session
+        prisma.session
           .delete({where: {id: sessionId}})
           .catch((error: unknown) => {
             console.error(`Failure deleting user session: `, error)
@@ -125,18 +129,19 @@ async function deleteOtherSessions(request: Request) {
     return
   }
   const user = await getUserFromSessionId(token)
-  await prismaWrite.session.deleteMany({
+  await ensurePrimary()
+  await prisma.session.deleteMany({
     where: {userId: user.id, NOT: {id: token}},
   })
 }
 
-async function getUser(request: Request) {
+async function getUser(request: Request, {timings}: {timings?: Timings} = {}) {
   const {session} = await getSession(request)
 
   const token = session.get(sessionIdKey) as string | undefined
   if (!token) return null
 
-  return getUserFromSessionId(token).catch((error: unknown) => {
+  return getUserFromSessionId(token, {timings}).catch((error: unknown) => {
     console.error(`Failure getting user from session ID:`, error)
     return null
   })
@@ -149,7 +154,7 @@ async function getUserSessionFromMagicLink(request: Request) {
     loginInfoSession.getMagicLink(),
   )
 
-  const user = await getUserByEmail(email)
+  const user = await prisma.user.findUnique({where: {email}})
   if (!user) return null
 
   const session = await getSession(request)
@@ -161,7 +166,7 @@ async function requireAdminUser(request: Request): Promise<User> {
   const user = await getUser(request)
   if (!user) {
     const session = await getSession(request)
-    session.signOut()
+    await session.signOut()
     throw redirect('/login', {headers: await session.getHeaders()})
   }
   if (user.role !== 'ADMIN') {
@@ -170,11 +175,14 @@ async function requireAdminUser(request: Request): Promise<User> {
   return user
 }
 
-async function requireUser(request: Request): Promise<User> {
-  const user = await getUser(request)
+async function requireUser(
+  request: Request,
+  {timings}: {timings?: Timings} = {},
+): Promise<User> {
+  const user = await getUser(request, {timings})
   if (!user) {
     const session = await getSession(request)
-    session.signOut()
+    await session.signOut()
     throw redirect('/login', {headers: await session.getHeaders()})
   }
   return user

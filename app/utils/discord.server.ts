@@ -1,6 +1,6 @@
-import type {User, Team} from '~/types'
-import {prismaWrite} from './prisma.server'
-import {getRequiredServerEnvVar} from './misc'
+import {type Team, type User} from '~/types.ts'
+import {getRequiredServerEnvVar, getTeam} from './misc.tsx'
+import {prisma} from './prisma.server.ts'
 
 const DISCORD_CLIENT_ID = getRequiredServerEnvVar('DISCORD_CLIENT_ID')
 const DISCORD_CLIENT_SECRET = getRequiredServerEnvVar('DISCORD_CLIENT_SECRET')
@@ -10,6 +10,7 @@ const DISCORD_GUILD_ID = getRequiredServerEnvVar('DISCORD_GUILD_ID')
 const DISCORD_RED_ROLE = getRequiredServerEnvVar('DISCORD_RED_ROLE')
 const DISCORD_YELLOW_ROLE = getRequiredServerEnvVar('DISCORD_YELLOW_ROLE')
 const DISCORD_BLUE_ROLE = getRequiredServerEnvVar('DISCORD_BLUE_ROLE')
+const DISCORD_MEMBER_ROLE = getRequiredServerEnvVar('DISCORD_MEMBER_ROLE')
 
 const discordRoleTeams: {
   [Key in Team]: string
@@ -29,6 +30,7 @@ type DiscordToken = {
   token_type: string
   access_token: string
 }
+type DiscordError = {message: string; code: number}
 
 async function fetchAsDiscordBot(endpoint: string, config?: RequestInit) {
   const url = new URL(`https://discord.com/api/${endpoint}`)
@@ -111,7 +113,7 @@ async function getDiscordUser(discordUserId: string) {
 }
 
 async function getMember(discordUserId: string) {
-  const member = await fetchJsonAsDiscordBot<DiscordMember>(
+  const member = await fetchJsonAsDiscordBot<DiscordMember | DiscordError>(
     `guilds/${DISCORD_GUILD_ID}/members/${discordUserId}`,
   )
   return member
@@ -121,12 +123,16 @@ async function updateDiscordRolesForUser(
   discordMember: DiscordMember,
   user: User,
 ) {
-  await prismaWrite.user.update({
+  await prisma.user.update({
     where: {id: user.id},
     data: {discordId: discordMember.user.id},
   })
 
-  const teamRole = discordRoleTeams[user.team]
+  const team = getTeam(user.team)
+  if (!team) {
+    return
+  }
+  const teamRole = discordRoleTeams[team]
 
   if (!discordMember.roles.includes(teamRole)) {
     await fetchAsDiscordBot(
@@ -134,7 +140,9 @@ async function updateDiscordRolesForUser(
       {
         method: 'PATCH',
         body: JSON.stringify({
-          roles: Array.from(new Set([...discordMember.roles, teamRole])),
+          roles: Array.from(
+            new Set([...discordMember.roles, DISCORD_MEMBER_ROLE, teamRole]),
+          ),
         }),
         // note using fetchJsonAsDiscordBot because this API doesn't return JSON.
         headers: {
@@ -182,7 +190,13 @@ async function connectDiscord({
   await new Promise(resolve => setTimeout(resolve, 300))
 
   const discordMember = await getMember(discordUser.id)
-  await updateDiscordRolesForUser(discordMember, user)
+  if ('user' in discordMember) {
+    await updateDiscordRolesForUser(discordMember, user)
+  } else if ('message' in discordMember) {
+    throw new Error(
+      `Discord Error (${discordMember.code}): ${discordMember.message}`,
+    )
+  }
 
   return discordMember
 }

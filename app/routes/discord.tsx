@@ -1,56 +1,63 @@
-import * as React from 'react'
-import {motion} from 'framer-motion'
 import {
   Accordion,
-  AccordionItem,
   AccordionButton,
+  AccordionItem,
   AccordionPanel,
   useAccordionItemContext,
 } from '@reach/accordion'
-import type {HeadersFunction, MetaFunction} from 'remix'
-import {json, useLoaderData} from 'remix'
-import type {KCDLoader} from '~/types'
-import {useRootData} from '~/utils/use-root-data'
+import {
+  json,
+  type HeadersFunction,
+  type LoaderFunction,
+  type MetaFunction,
+} from '@remix-run/node'
+import {Outlet, useLoaderData} from '@remix-run/react'
+import {motion} from 'framer-motion'
+import {ButtonLink} from '~/components/button.tsx'
+import {FeatureCard} from '~/components/feature-card.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {
+  BriefcaseIcon,
+  CodeIcon,
+  DiscordLogo,
+  EmojiHappyIcon,
+  HeartIcon,
+  LaptopIcon,
+  MessageIcon,
+  RocketIcon,
+  TrophyIcon,
+  UsersIcon,
+} from '~/components/icons.tsx'
+import {CourseSection} from '~/components/sections/course-section.tsx'
+import {HeaderSection} from '~/components/sections/header-section.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {TestimonialSection} from '~/components/sections/testimonial-section.tsx'
+import {Spacer} from '~/components/spacer.tsx'
+import {H2, H5, H6, Paragraph} from '~/components/typography.tsx'
+import {getGenericSocialImage, getImgProps, images} from '~/images.tsx'
 import {
   getDiscordAuthorizeURL,
   getDisplayUrl,
   getUrl,
   reuseUsefulLoaderHeaders,
-} from '~/utils/misc'
-import {ArrowLink} from '~/components/arrow-button'
-import {ButtonLink} from '~/components/button'
-import {H2, H5, H6, Paragraph} from '~/components/typography'
-import {getGenericSocialImage, getImgProps, images} from '~/images'
-import {Grid} from '~/components/grid'
-import {externalLinks} from '../external-links'
-import {UsersIcon} from '~/components/icons/users-icon'
-import {CodeIcon} from '~/components/icons/code-icon'
-import {NumberedPanel} from '~/components/numbered-panel'
-import {TestimonialSection} from '~/components/sections/testimonial-section'
-import {CourseSection} from '~/components/sections/course-section'
-import {FeatureCard} from '~/components/feature-card'
-import {HeroSection} from '~/components/sections/hero-section'
-import {HeaderSection} from '~/components/sections/header-section'
-import {getTestimonials} from '~/utils/testimonials.server'
-import type {Testimonial} from '~/utils/testimonials.server'
-import {DiscordLogo} from '~/components/icons/discord-logo'
-import {HeartIcon} from '~/components/icons/heart-icon'
-import {EmojiHappyIcon} from '~/components/icons/emoji-happy-icon'
-import {BriefcaseIcon} from '~/components/icons/briefcase-icon'
-import {RocketIcon} from '~/components/icons/rocket-icon'
-import {TrophyIcon} from '~/components/icons/trophy-icon'
-import LaptopIcon from '~/components/icons/laptop-icon'
-import {MessageIcon} from '~/components/icons/message-icon'
-import type {LoaderData as RootLoaderData} from '../root'
-import {getSocialMetas} from '~/utils/seo'
+  useCapturedRouteError,
+} from '~/utils/misc.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {getTestimonials, type Testimonial} from '~/utils/testimonials.server.ts'
+import {getServerTimeHeader} from '~/utils/timing.server.ts'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {externalLinks} from '~/external-links.tsx'
+import {type RootLoaderType} from '~/root.tsx'
 
 type LoaderData = {
   testimonials: Array<Testimonial>
 }
 
-export const loader: KCDLoader = async ({request}) => {
+export const loader: LoaderFunction = async ({request}) => {
+  const timings = {}
   const testimonials = await getTestimonials({
     request,
+    timings,
     subjects: ['Discord Community'],
     categories: ['community'],
   })
@@ -60,29 +67,29 @@ export const loader: KCDLoader = async ({request}) => {
     headers: {
       'Cache-Control': 'public, max-age=3600',
       Vary: 'Cookie',
+      'Server-Timing': getServerTimeHeader(timings),
     },
   })
 }
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: 'The KCD Community on Discord',
-      description:
-        'Make friends, share ideas, connect, network, and improve yourself in the KCD Community on Discord',
-      url: getUrl(requestInfo),
-      image: getGenericSocialImage({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: images.helmet.id,
-        words: `Join the KCD Community on Discord`,
-      }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  return getSocialMetas({
+    title: 'The Epic Web Community on Discord',
+    description:
+      'Make friends, share ideas, connect, network, and improve yourself in the Epic Web Community on Discord',
+    url: getUrl(requestInfo),
+    image: getGenericSocialImage({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: images.helmet.id,
+      words: `Join the Epic Web Community on Discord`,
     }),
-  }
+  })
 }
 
 export interface CategoryCardProps {
@@ -97,7 +104,7 @@ function CategoryCardContent({title, description, number}: CategoryCardProps) {
   return (
     <>
       <H5 as="div" className="text-primary w-full transition">
-        <AccordionButton className="focus:outline-none relative w-full text-left">
+        <AccordionButton className="relative w-full text-left focus:outline-none">
           <div className="absolute -bottom-12 -left-8 -right-8 -top-12 rounded-lg lg:-left-28 lg:-right-20" />
 
           <span className="absolute -left-16 top-0 hidden text-lg lg:block">
@@ -170,19 +177,15 @@ export default function Discord() {
         imageBuilder={images.helmet}
         arrowUrl="#reasons-to-join"
         arrowLabel="Is this something for me?"
-        action={
-          <ButtonLink variant="primary" href={authorizeURL} className="mr-auto">
-            Join Discord
-          </ButtonLink>
-        }
+        action={<Outlet />}
       />
       <main>
         <Grid className="mb-24 lg:mb-64">
           <div className="col-span-full lg:col-span-6 lg:col-start-1">
-            <div className="aspect-h-6 aspect-w-4 mb-12 lg:mb-0">
+            <div className="aspect-[4/6] mb-12 lg:mb-0">
               <img
-                className="rounded-lg object-cover"
                 {...getImgProps(images.kentListeningAtReactRally, {
+                  className: 'rounded-lg object-cover',
                   widths: [410, 650, 820, 1230, 1640, 2460],
                   sizes: [
                     '(max-width: 1023px) 80vw',
@@ -214,7 +217,7 @@ export default function Discord() {
             </H6>
             <Paragraph className="mb-12">
               {`
-                Discord is a chat application. The KCD Community on Discord is
+                Discord is a chat application. The Epic Web Community on Discord is
                 a community of people who want to make connections, share ideas,
                 and use software to help make the world a better place.
               `}
@@ -227,7 +230,7 @@ export default function Discord() {
                 We're better when we work together. Discord allows us to have
                 meaningful and nuanced conversations about building software.
                 If you want to ask questions or provide your own opinions, this
-                discord community is for you. We'll celebrate your sucesses and
+                discord community is for you. We'll celebrate your successes and
                 lament your misfortunes and failures. This community is focused
                 on software development primarily, but we're humans and we
                 embrace that (we even have a channel on parenting!).
@@ -382,7 +385,7 @@ export default function Discord() {
             </H6>
             <Paragraph className="mb-16">
               {`
-                The KCD Community on Discord is full of friendly people. When
+                The Epic Web Community on Discord is full of friendly people. When
                 you put together a learning club here, in addition to learning
                 better, you'll develop new friendships.
               `}
@@ -393,7 +396,7 @@ export default function Discord() {
             </H6>
             <Paragraph className="mb-16">
               {`
-                By joining the KCD Community on Discord, you can ask questions
+                By joining the Epic Web Community on Discord, you can ask questions
                 that I'll answer during office hours. Often these questions come
                 from discussions you and your fellow learners have during your
                 learning club meetings. So if you all get stuck on the same
@@ -403,50 +406,11 @@ export default function Discord() {
           </div>
         </Grid>
 
-        <div className="mb-24 lg:mb-48">
-          <Grid featured>
-            <div className="col-span-full mb-40 flex flex-col items-stretch lg:col-span-5 lg:mb-0 lg:items-start">
-              <H2 className="mb-8">
-                {`Enjoy community meetups in the discord server (and host your own!).`}
-              </H2>
-              <H2 className="mb-16" variant="secondary" as="p">
-                Voice and video chats hosted and managed on the KCD Discord
-                server.
-              </H2>
-              <ButtonLink variant="primary" href={authorizeURL}>
-                Join Discord
-              </ButtonLink>
-            </div>
+        {data.testimonials.length ? <Spacer size="base" /> : null}
 
-            <div className="col-span-full lg:col-span-5 lg:col-start-8 lg:mr-12">
-              <ol className="space-y-24 lg:space-y-16">
-                <NumberedPanel
-                  number={1}
-                  title={`What are "meetups"?`}
-                  description={`It's an event. It can be about anything and have any format.`}
-                />
-                <NumberedPanel
-                  number={2}
-                  title="So, how do I use them?"
-                  description={`You go to the meetups channel to see who's hosting meetups and let the bot know which you'd like to be notified about.`}
-                />
-                <NumberedPanel
-                  number={3}
-                  title="Can I organize meetups myself or are there only curated meetups?"
-                  description={`Anyone can host a meetup. Simply tell the bot about what you want to do and it'll let everyone know about it in the meetups channel.`}
-                />
-                <ArrowLink to="/meetups" direction="right">
-                  Learn more about meetups
-                </ArrowLink>
-              </ol>
-            </div>
-          </Grid>
-        </div>
+        <TestimonialSection testimonials={data.testimonials} />
 
-        <TestimonialSection
-          testimonials={data.testimonials}
-          className="mb-24 lg:mb-64"
-        />
+        <Spacer size="base" />
 
         <HeaderSection
           title="Here's a quick look at all categories."
@@ -472,13 +436,13 @@ export default function Discord() {
             />
             <CategoryCard
               number={3}
-              title="Meetups"
-              description="This is where all meetup activity happens. Go here to chat during meetups, follow meetup hosts, and sign up to be notified of new meetups."
+              title="Epic Web Conf"
+              description="This is where we discuss stuff going on with Epic Web Conference!"
             />
             <CategoryCard
               number={4}
-              title="Clubs"
-              description="Here's where you can coordinate setting up a new KCD Learning Club. Club captains also get access to a special channel for captains to talk about how to make the most of the experience for everyone."
+              title="Epic Stack"
+              description="Talk with others who are buildings applications using the Epic Stack."
             />
           </Accordion>
           <Accordion
@@ -498,13 +462,13 @@ export default function Discord() {
             />
             <CategoryCard
               number={7}
-              title="EpicReact.dev"
-              description={`Are you trying to learn React? It can help a lot to have others to help you go through the material. Ask questions about the material in these channels and people will know what you're talking about and jump in to help if they can.`}
+              title="Courses"
+              description="Exclusive channels for folks going through the Epic Web Courses. Ask and answer questions, share your progress, and get help from others."
             />
             <CategoryCard
               number={8}
-              title="TestingJavaScript.com"
-              description={`Testing can be a tricky subject, so we've got channels for every module in TestingJavaScript.com for you to ask and answer questions about the material.`}
+              title="Clubs"
+              description="Here's where you can coordinate setting up a new KCD Learning Club. Club captains also get access to a special channel for captains to talk about how to make the most of the experience for everyone."
             />
           </Accordion>
         </Grid>
@@ -512,8 +476,8 @@ export default function Discord() {
         <Grid className="mb-24 lg:mb-64">
           <div className="col-span-full lg:col-span-4 lg:col-start-2">
             <img
-              className="object-contain"
               {...getImgProps(images.helmet, {
+                className: 'object-contain',
                 widths: [420, 512, 840, 1260, 1024, 1680, 2520],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -546,12 +510,17 @@ export default function Discord() {
   )
 }
 
-export function ErrorBoundary({error}: {error: Error}) {
+export function ErrorBoundary() {
+  const error = useCapturedRouteError()
   console.error(error)
-  return (
-    <div>
-      <h2>Error</h2>
-      <pre>{error.stack}</pre>
-    </div>
-  )
+  if (error instanceof Error) {
+    return (
+      <div>
+        <h2>Error</h2>
+        <pre>{error.stack}</pre>
+      </div>
+    )
+  } else {
+    return <h2>Unknown Error</h2>
+  }
 }

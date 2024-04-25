@@ -1,11 +1,11 @@
+import pProps from 'p-props'
 import * as YAML from 'yaml'
-import {markdownToHtmlUnwrapped} from './markdown.server'
-import type {Timings} from './metrics.server'
-import {redisCache} from './redis.server'
-import {cachified} from './cache.server'
-import {downloadDirList, downloadFile} from './github.server'
-import {typedBoolean} from './misc'
-import type {Workshop} from '~/types'
+import {type Workshop} from '~/types.ts'
+import {cache, cachified} from './cache.server.ts'
+import {downloadDirList, downloadFile} from './github.server.ts'
+import {markdownToHtmlUnwrapped} from './markdown.server.ts'
+import {typedBoolean} from './misc.tsx'
+import {type Timings} from './timing.server.ts'
 
 type RawWorkshop = {
   title?: string
@@ -20,7 +20,7 @@ type RawWorkshop = {
   prerequisite?: string
 }
 
-function getWorkshops({
+async function getWorkshops({
   request,
   forceFresh,
   timings,
@@ -29,13 +29,15 @@ function getWorkshops({
   forceFresh?: boolean
   timings?: Timings
 }) {
+  const key = 'content:workshops'
   return cachified({
-    cache: redisCache,
-    key: 'content:workshops',
-    maxAge: 1000 * 60 * 60 * 24 * 7,
+    cache,
     request,
-    forceFresh,
     timings,
+    forceFresh,
+    key,
+    ttl: 1000 * 60 * 60 * 24 * 7,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
     getFreshValue: async () => {
       const dirList = await downloadDirList(`content/workshops`)
       const workshopFileList = dirList
@@ -53,8 +55,6 @@ function getWorkshops({
 }
 
 async function getWorkshop(slug: string): Promise<null | Workshop> {
-  const {default: pProps} = await import('p-props')
-
   const rawWorkshopString = await downloadFile(
     `content/workshops/${slug}.yml`,
   ).catch(() => null)

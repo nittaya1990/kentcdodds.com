@@ -1,6 +1,3 @@
-import * as React from 'react'
-import {Link, useLocation} from 'remix'
-import clsx from 'clsx'
 import {
   Menu,
   MenuButton,
@@ -9,30 +6,32 @@ import {
   MenuPopover,
   useMenuButtonContext,
 } from '@reach/menu-button'
-import {useEffect} from 'react'
+import {Link, useFetcher, useLocation} from '@remix-run/react'
+import {clsx} from 'clsx'
 import {
   AnimatePresence,
   motion,
   useAnimation,
   useReducedMotion,
 } from 'framer-motion'
-import type {User} from '@prisma/client'
-import {kodyProfiles} from '~/images'
-import {Theme, Themed, useTheme} from '~/utils/theme-provider'
-import type {OptionalTeam} from '~/utils/misc'
-import {SunIcon} from './icons/sun-icon'
-import {MoonIcon} from './icons/moon-icon'
-import {TeamCircle} from './team-circle'
-import {useElementState} from './hooks/use-element-state'
-import {useTeam} from '~/utils/team-provider'
-import {useRootData} from '~/utils/use-root-data'
+import * as React from 'react'
+import {useEffect} from 'react'
+import {kodyProfiles} from '~/images.tsx'
+import {type OptionalTeam} from '~/utils/misc.tsx'
+import {useTeam} from '~/utils/team-provider.tsx'
+import {THEME_FETCHER_KEY, useOptimisticThemeMode} from '~/utils/theme.tsx'
+import {useOptionalUser, useRootData} from '~/utils/use-root-data.ts'
+import {useElementState} from './hooks/use-element-state.tsx'
+import {LaptopIcon, MoonIcon, SunIcon} from './icons.tsx'
+import {TeamCircle} from './team-circle.tsx'
+import {useRequestInfo} from '~/utils/request-info.ts'
 
 const LINKS = [
   {name: 'Blog', to: '/blog'},
   {name: 'Courses', to: '/courses'},
   {name: 'Discord', to: '/discord'},
-  {name: 'Chats', to: '/chats'},
-  {name: 'Calls', to: '/calls'},
+  {name: 'Chats', to: '/chats/05'},
+  {name: 'Calls', to: '/calls/04'},
   {name: 'Workshops', to: '/workshops'},
   {name: 'About', to: '/about'},
 ]
@@ -52,7 +51,7 @@ function NavLink({
       <Link
         prefetch="intent"
         className={clsx(
-          'underlined focus:outline-none block whitespace-nowrap text-lg font-medium hover:text-team-current focus:text-team-current',
+          'underlined block whitespace-nowrap text-lg font-medium hover:text-team-current focus:text-team-current focus:outline-none',
           {
             'active text-team-current': isSelected,
             'text-secondary': !isSelected,
@@ -67,45 +66,72 @@ function NavLink({
 
 const iconTransformOrigin = {transformOrigin: '50% 100px'}
 function DarkModeToggle({variant = 'icon'}: {variant?: 'icon' | 'labelled'}) {
-  const [, setTheme] = useTheme()
+  const requestInfo = useRequestInfo()
+  const fetcher = useFetcher({key: THEME_FETCHER_KEY})
+
+  const optimisticMode = useOptimisticThemeMode()
+  const mode = optimisticMode ?? requestInfo.userPrefs.theme ?? 'system'
+  const nextMode =
+    mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system'
+
+  const iconSpanClassName =
+    'absolute inset-0 transform transition-transform duration-700 motion-reduce:duration-[0s]'
   return (
-    <button
-      onClick={() => {
-        setTheme(previousTheme =>
-          previousTheme === Theme.DARK ? Theme.LIGHT : Theme.DARK,
-        )
-      }}
-      className={clsx(
-        'border-secondary hover:border-primary focus:border-primary focus:outline-none inline-flex h-14 items-center justify-center overflow-hidden rounded-full border-2 p-1 transition',
-        {
-          'w-14': variant === 'icon',
-          'px-8': variant === 'labelled',
-        },
-      )}
-    >
-      {/* note that the duration is longer then the one on body, controlling the bg-color */}
-      <div className="relative h-8 w-8">
-        <span
-          className="absolute inset-0 rotate-90 transform text-black transition duration-1000 motion-reduce:duration-[0s] dark:rotate-0 dark:text-white"
-          style={iconTransformOrigin}
-        >
-          <MoonIcon />
-        </span>
-        <span
-          className="absolute inset-0 rotate-0 transform text-black transition duration-1000 motion-reduce:duration-[0s] dark:-rotate-90 dark:text-white"
-          style={iconTransformOrigin}
-        >
-          <SunIcon />
-        </span>
-      </div>
-      <span
-        className={clsx('ml-4 text-black dark:text-white', {
-          'sr-only': variant === 'icon',
-        })}
+    <fetcher.Form method="POST" action="/action/set-theme">
+      <input type="hidden" name="theme" value={nextMode} />
+
+      <button
+        type="submit"
+        className={clsx(
+          'border-secondary hover:border-primary focus:border-primary inline-flex h-14 items-center justify-center overflow-hidden rounded-full border-2 p-1 transition focus:outline-none',
+          {
+            'w-14': variant === 'icon',
+            'px-8': variant === 'labelled',
+          },
+        )}
       >
-        <Themed dark="switch to light mode" light="switch to dark mode" />
-      </span>
-    </button>
+        {/* note that the duration is longer then the one on body, controlling the bg-color */}
+        <div className="relative h-8 w-8">
+          <span
+            className={clsx(
+              iconSpanClassName,
+              mode === 'dark' ? 'rotate-0' : 'rotate-90',
+            )}
+            style={iconTransformOrigin}
+          >
+            <MoonIcon />
+          </span>
+          <span
+            className={clsx(
+              iconSpanClassName,
+              mode === 'light' ? 'rotate-0' : '-rotate-90',
+            )}
+            style={iconTransformOrigin}
+          >
+            <SunIcon />
+          </span>
+
+          <span
+            className={clsx(
+              iconSpanClassName,
+              mode === 'system' ? 'translate-y-0' : 'translate-y-10',
+            )}
+            style={iconTransformOrigin}
+          >
+            <LaptopIcon size={32} />
+          </span>
+        </div>
+        <span className={clsx('ml-4', {'sr-only': variant === 'icon'})}>
+          {`Switch to ${
+            nextMode === 'system'
+              ? 'system'
+              : nextMode === 'light'
+                ? 'light'
+                : 'dark'
+          } mode`}
+        </span>
+      </button>
+    </fetcher.Form>
   )
 }
 
@@ -173,8 +199,8 @@ function MobileMenuList() {
 }
 
 const topVariants = {
-  open: {rotate: 45, y: 7},
-  closed: {rotate: 0, y: 0},
+  open: {rotate: 45, y: 7, originX: '16px', originY: '10px'},
+  closed: {rotate: 0, y: 0, originX: 0, originY: 0},
 }
 
 const centerVariants = {
@@ -183,8 +209,8 @@ const centerVariants = {
 }
 
 const bottomVariants = {
-  open: {rotate: -45, y: -5},
-  closed: {rotate: 0, y: 0},
+  open: {rotate: -45, y: -5, originX: '16px', originY: '22px'},
+  closed: {rotate: 0, y: 0, originX: 0, originY: 0},
 }
 
 function MobileMenu() {
@@ -196,7 +222,10 @@ function MobileMenu() {
         const state = isExpanded ? 'open' : 'closed'
         return (
           <>
-            <MenuButton className="focus:border-primary hover:border-primary border-secondary text-primary focus:outline-none inline-flex h-14 w-14 items-center justify-center rounded-full border-2 p-1 transition">
+            <MenuButton
+              title="Site Menu"
+              className="focus:border-primary hover:border-primary border-secondary text-primary inline-flex h-14 w-14 items-center justify-center rounded-full border-2 p-1 transition focus:outline-none"
+            >
               <svg
                 width="32"
                 height="32"
@@ -261,15 +290,14 @@ function ProfileButton({
   imageUrl,
   imageAlt,
   team,
-  user,
   magicLinkVerified,
 }: {
   imageUrl: string
   imageAlt: string
   team: OptionalTeam
-  user: User | null
   magicLinkVerified: boolean | undefined
 }) {
+  const user = useOptionalUser()
   const controls = useAnimation()
   const [ref, state] = useElementState()
   const shouldReduceMotion = useReducedMotion()
@@ -304,7 +332,7 @@ function ProfileButton({
         user ? 'My Account' : magicLinkVerified ? 'Finish signing up' : 'Login'
       }
       className={clsx(
-        'focus:outline-none ml-4 inline-flex h-14 w-14 items-center justify-center rounded-full',
+        'ml-4 inline-flex h-14 w-14 items-center justify-center rounded-full focus:outline-none',
       )}
       ref={ref}
     >
@@ -312,9 +340,10 @@ function ProfileButton({
         <TeamCircle size={56} team={team} />
       </motion.div>
       <img
-        className={clsx('inline w-10 select-none rounded-full')}
+        className={clsx('inline w-10 h-10 select-none rounded-full')}
         src={imageUrl}
         alt={imageAlt}
+        crossOrigin="anonymous"
       />
     </Link>
   )
@@ -322,17 +351,17 @@ function ProfileButton({
 
 function Navbar() {
   const [team] = useTeam()
-  const {requestInfo, userInfo, user} = useRootData()
+  const {requestInfo, userInfo} = useRootData()
   const avatar = userInfo ? userInfo.avatar : kodyProfiles[team]
 
   return (
     <div className="px-5vw py-9 lg:py-12">
       <nav className="text-primary mx-auto flex max-w-8xl items-center justify-between">
-        <div>
+        <div className="flex justify-center gap-4 align-middle">
           <Link
             prefetch="intent"
             to="/"
-            className="text-primary underlined focus:outline-none block whitespace-nowrap text-2xl font-medium transition"
+            className="text-primary underlined block whitespace-nowrap text-2xl font-medium transition focus:outline-none"
           >
             <h1>Kent C. Dodds</h1>
           </Link>
@@ -359,7 +388,6 @@ function Navbar() {
             imageUrl={avatar.src}
             imageAlt={avatar.alt}
             team={team}
-            user={user}
           />
         </div>
       </nav>

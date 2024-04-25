@@ -1,9 +1,11 @@
 function getEnv() {
   return {
     FLY: process.env.FLY,
+    MODE: process.env.NODE_ENV,
     NODE_ENV: process.env.NODE_ENV,
     DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
-    PRIMARY_REGION: process.env.PRIMARY_REGION,
+    DISABLE_METRONOME: process.env.DISABLE_METRONOME,
+    SENTRY_DSN: process.env.SENTRY_DSN,
   }
 }
 

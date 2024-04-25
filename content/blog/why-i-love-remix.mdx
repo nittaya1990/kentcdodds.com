@@ -16,6 +16,14 @@ meta:
     - performance
     - css
     - user experience
+translations:
+  - language: 日本語
+    link: https://note.com/lada496/n/nce2525980fcc
+  - language: Português (do Brasil)
+    link: https://dev.to/remix-run-br/por-que-eu-amo-remix-por-kent-c-dodds-4379
+    author:
+      name: William Gonçalves
+      link: https://owilliamgoncalves.dev
 bannerCloudinaryId: unsplash/photo-1587096473086-abb7a1ec4393
 bannerAlt: blue and black compact disc
 bannerCredit: Photo by [Gio Bartlett](https://unsplash.com/photos/syexL_Ke5V8)
@@ -145,13 +153,13 @@ export default function AttendeesRoute() {
   return <div>{/* render the data */}</div>
 }
 
-export function ErrorBoundary({error}) {
+export function ErrorBoundary() {
+  const error = useRouteError()
+  // when true, this is what used to go to `CatchBoundary` in Remix v1
+  if (isRouteErrorResponse(error)) {
+    return <div>{/* render the error for 400-status level responses */}</div>
+  }
   return <div>{/* render an "unexpected error" message */}</div>
-}
-
-export function CatchBoundary() {
-  const caught = useCatch()
-  return <div>{/* render the error for 400-status level responses */}</div>
 }
 ```
 
@@ -160,12 +168,12 @@ stick this wherever you want the pending UI to show up (whether global or
 local):
 
 ```tsx
-const transition = useTransition()
+const navigation = useNavigation()
 
 const text =
-  transition.state === 'submitting'
+  navigation.state === 'submitting'
     ? 'Saving...'
-    : transition.state === 'loading'
+    : navigation.state === 'loading'
     ? 'Saved!'
     : 'Ready'
 ```
@@ -240,7 +248,7 @@ export default function AttendeesRoute() {
   // look mah! No event handler or useEffect necessary!
   // race conditions handled.
   return (
-    <Form method="post">
+    <Form method="POST">
       <div>
         <label htmlFor="name-input">Name: </label>
         <input id="name-input" name="name" />

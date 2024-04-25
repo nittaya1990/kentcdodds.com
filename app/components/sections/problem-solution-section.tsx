@@ -1,24 +1,23 @@
-import * as React from 'react'
-import {Link} from 'remix'
-import clsx from 'clsx'
 import {
-  Tabs,
   Tab as ReachTab,
-  TabProps,
   TabList,
-  TabPanels,
   TabPanel,
+  TabPanels,
+  Tabs,
+  type TabProps,
 } from '@reach/tabs'
+import {Link} from '@remix-run/react'
+import {clsx} from 'clsx'
 import {differenceInYears} from 'date-fns'
-import {motion, AnimatePresence} from 'framer-motion'
-import type {Team} from '~/types'
-import {images, getImgProps} from '~/images'
-import type {ImageBuilder} from '~/images'
-import {teamTextColorClasses} from '~/utils/misc'
-import {Grid} from '../grid'
-import {H2, H3, Paragraph} from '../typography'
-import {ArrowLink} from '../arrow-button'
-import {ArrowIcon} from '../icons/arrow-icon'
+import {AnimatePresence, motion} from 'framer-motion'
+import * as React from 'react'
+import {getImgProps, images, type ImageBuilder} from '~/images.tsx'
+import {type Team} from '~/types.ts'
+import {teamTextColorClasses} from '~/utils/misc.tsx'
+import {ArrowLink} from '../arrow-button.tsx'
+import {Grid} from '../grid.tsx'
+import {ArrowIcon} from '../icons.tsx'
+import {H2, H3, Paragraph} from '../typography.tsx'
 
 function Tab({isSelected, children}: TabProps & {isSelected?: boolean}) {
   return (
@@ -27,7 +26,7 @@ function Tab({isSelected, children}: TabProps & {isSelected?: boolean}) {
         'hover:text-primary inline-flex w-full items-center border-none p-0 transition focus:bg-transparent',
         {
           'text-primary': isSelected,
-          'text-gray-400 dark:text-blueGray-500': !isSelected,
+          'text-gray-600 dark:text-slate-500': !isSelected,
         },
       )}
     >
@@ -67,8 +66,8 @@ function ContentPanel({
               animate={{x: 0, opacity: 1}}
               exit={{x: 40, opacity: 0}}
               transition={{damping: 0, duration: 0.25}}
-              className="mb-6 h-44 lg:mb-14"
               {...getImgProps(imageBuilder, {
+                className: 'mb-6 h-44 lg:mb-14',
                 widths: [180, 360, 540],
                 sizes: ['11rem'],
               })}
@@ -135,7 +134,11 @@ function ProblemSolutionSection({
           <Paragraph className="mt-8">
             {`My `}
             <strong>{blogPostCount}</strong>
-            {` blog posts (and counting) have been read ${totalBlogReads} of times by ${totalBlogReaders} people. There you'll find blogs about `}
+            {` blog posts (and counting) have been `}
+            <Link prefetch="intent" to="/teams#read-rankings">
+              read
+            </Link>
+            {` ${totalBlogReads} times by ${totalBlogReaders} people. There you'll find blogs about `}
             <Link prefetch="intent" to="/blog?q=javascript">
               JavaScript
             </Link>
@@ -155,7 +158,7 @@ function ProblemSolutionSection({
             <Link prefetch="intent" to="/blog?q=career">
               your career
             </Link>
-            {`, and `}
+            {`, `}
             <Link prefetch="intent" to="/blog">
               and more
             </Link>
@@ -198,12 +201,24 @@ function ProblemSolutionSection({
               years. Tens of thousands of people have increased their confidence
               in shipping software with
             `}
-            <a href="https://testingjavascript.com">TestingJavaScript.com</a>
+            <a
+              href="https://testingjavascript.com"
+              className="!text-yellow-500"
+            >
+              TestingJavaScript.com
+            </a>
             {`
               and even more have improved the performance and maintainability
               of their React applications from what they've learned from
             `}
-            <a href="https://epicreact.dev">EpicReact.dev</a>.
+            <a href="https://epicreact.dev" className="!text-blue-500">
+              EpicReact.dev
+            </a>
+            {`. My latest efforts are pushing things to the whole stack with `}
+            <a href="https://www.epicstack.dev" className="!text-red-500">
+              EpicWeb.dev
+            </a>
+            .
           </Paragraph>
 
           <ArrowLink to="/courses" className="mt-14">

@@ -1,10 +1,9 @@
-import {render, screen} from '@testing-library/react'
+import {render, screen, act} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import * as React from 'react'
 
 import {UseUndoExample} from '../use-undo.example.jsx'
 
-test('allows you to undo and redo', () => {
+test('allows you to undo and redo', async () => {
   render(<UseUndoExample />)
   const present = screen.getByText(/present/i)
   const past = screen.getByText(/past/i)
@@ -23,7 +22,7 @@ test('allows you to undo and redo', () => {
 
   // add second value
   input.value = 'two'
-  userEvent.click(submit)
+  await act(() => userEvent.click(submit))
 
   // assert new state
   expect(undo).toBeEnabled()
@@ -34,7 +33,7 @@ test('allows you to undo and redo', () => {
 
   // add third value
   input.value = 'three'
-  userEvent.click(submit)
+  await act(() => userEvent.click(submit))
 
   // assert new state
   expect(undo).toBeEnabled()
@@ -44,7 +43,7 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future:`)
 
   // undo
-  userEvent.click(undo)
+  await act(() => userEvent.click(undo))
 
   // assert "undone" state
   expect(undo).toBeEnabled()
@@ -54,7 +53,7 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future: three`)
 
   // undo again
-  userEvent.click(undo)
+  await act(() => userEvent.click(undo))
 
   // assert "double-undone" state
   expect(undo).toBeDisabled()
@@ -64,7 +63,7 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future: two, three`)
 
   // redo
-  userEvent.click(redo)
+  await act(() => userEvent.click(redo))
 
   // assert undo + undo + redo state
   expect(undo).toBeEnabled()
@@ -75,7 +74,7 @@ test('allows you to undo and redo', () => {
 
   // add fourth value
   input.value = 'four'
-  userEvent.click(submit)
+  await act(() => userEvent.click(submit))
 
   // assert final state (note the lack of "third")
   expect(undo).toBeEnabled()
@@ -85,7 +84,9 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future:`)
 })
 
+// TODO: figure out what happened in the latest version of testing library with
+// this project that requires wrapping things in act
 /*
 eslint
-  max-statements: "off",
+  testing-library/no-unnecessary-act: "off",
 */

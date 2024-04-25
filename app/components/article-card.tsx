@@ -1,25 +1,22 @@
-import * as React from 'react'
-import {Link} from 'remix'
-import clsx from 'clsx'
-import formatDate from 'date-fns/format'
-import parseISO from 'date-fns/parseISO'
-import type {MdxListItem, Team} from '~/types'
-import {getImageBuilder, getImgProps} from '~/images'
-import {H3} from './typography'
-import {ClipboardCopyButton} from './clipboard-copy-button'
-import {MissingSomething} from './kifs'
-import {BlurrableImage} from './blurrable-image'
-import {useRootData} from '~/utils/use-root-data'
-import {getBannerAltProp, getBannerTitleProp} from '~/utils/mdx'
+import {Link} from '@remix-run/react'
+import {clsx} from 'clsx'
+import {getImageBuilder, getImgProps} from '~/images.tsx'
+import {type MdxListItem, type Team} from '~/types.ts'
+import {getBannerAltProp, getBannerTitleProp} from '~/utils/mdx.tsx'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {BlurrableImage} from './blurrable-image.tsx'
+import {ClipboardCopyButton} from './clipboard-copy-button.tsx'
+import {MissingSomething} from './kifs.tsx'
+import {H3} from './typography.tsx'
 
 function ArticleCard({
   leadingTeam,
   article: {
     readTime,
+    dateDisplay,
     slug,
     frontmatter,
     frontmatter: {
-      date = formatDate(new Date(), 'yyyy-MM-ii'),
       title = 'Untitled Post',
       bannerCloudinaryId,
       bannerBlurDataUrl,
@@ -43,14 +40,14 @@ function ArticleCard({
     >
       <Link
         prefetch="intent"
-        className="group peer focus:outline-none relative block w-full"
+        className="group peer relative block w-full focus:outline-none"
         to={`/blog/${slug}`}
       >
         {bannerCloudinaryId ? (
           <BlurrableImage
             key={bannerCloudinaryId}
             blurDataUrl={bannerBlurDataUrl}
-            className="aspect-h-4 aspect-w-3 rounded-lg"
+            className="aspect-[3/4] rounded-lg"
             img={
               <img
                 title={frontmatter.title ?? getBannerTitleProp(frontmatter)}
@@ -77,19 +74,22 @@ function ArticleCard({
                   },
                 )}
                 className="focus-ring w-full rounded-lg object-cover object-center transition"
+                loading="lazy"
               />
             }
           />
         ) : (
-          <div className="aspect-h-4 aspect-w-3">
+          <div className="aspect-[3/4]">
             <div className="focus-ring w-full rounded-lg transition">
               <MissingSomething aspectRatio="3:4" />
             </div>
           </div>
         )}
 
-        <div className="mt-8 text-xl font-medium text-blueGray-500">
-          {formatDate(parseISO(date), 'PPP')} — {readTime?.text ?? 'quick read'}
+        <div className="mt-8 text-xl font-medium text-gray-500">
+          {[dateDisplay, readTime?.text ?? 'quick read']
+            .filter(Boolean)
+            .join(' — ')}
         </div>
         <H3 as="div" className="mt-4">
           {title}

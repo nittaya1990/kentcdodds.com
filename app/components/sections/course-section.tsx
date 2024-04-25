@@ -1,8 +1,7 @@
-import * as React from 'react'
-import {Grid} from '../grid'
-import {images} from '~/images'
-import {CourseCard} from '../course-card'
-import {HeaderSection} from './header-section'
+import {images} from '~/images.tsx'
+import {CourseCard} from '../course-card.tsx'
+import {Grid} from '../grid.tsx'
+import {HeaderSection} from './header-section.tsx'
 
 function CourseSection() {
   return (
@@ -15,6 +14,16 @@ function CourseSection() {
         className="mb-16"
       />
       <Grid>
+        <div className="col-span-full">
+          <CourseCard
+            title="Epic Web"
+            description="Become a full stack web dev."
+            // this swap is intentional. The dark looks nicer on light and vice versa
+            darkImageBuilder={images.courseEpicWebLight}
+            lightImageBuilder={images.courseEpicWebDark}
+            courseUrl="https://www.epicweb.dev"
+          />
+        </div>
         <div className="col-span-full lg:col-span-6">
           <CourseCard
             title="Epic React"

@@ -1,9 +1,8 @@
-import * as React from 'react'
-import {getImgProps, images} from '~/images'
-import {H2} from '../typography'
-import {ArrowLink} from '../arrow-button'
-import {Grid} from '../grid'
-import {DiscordLogo} from '../icons/discord-logo'
+import {getImgProps, images} from '~/images.tsx'
+import {ArrowLink} from '../arrow-button.tsx'
+import {Grid} from '../grid.tsx'
+import {DiscordLogo} from '../icons.tsx'
+import {H2} from '../typography.tsx'
 
 function DiscordSection() {
   return (
@@ -26,15 +25,15 @@ function DiscordSection() {
           className="mt-20"
           prefetch="intent"
         >
-          Learn more about the KCD Community on Discord
+          Learn more about the Epic Web Community on Discord
         </ArrowLink>
       </div>
 
       <div className="relative hidden lg:col-span-6 lg:col-start-7 lg:block">
         <div className="h-full w-full">
           <img
-            className="h-full w-full rounded-lg object-cover"
             {...getImgProps(images.kentCodingWithKody, {
+              className: 'h-full w-full rounded-lg object-cover',
               // this image is hidden at max-width of 1023px
               // so we set that to 0px and have a width for 1px
               // to save data on the request
@@ -63,9 +62,7 @@ function DiscordSection() {
           </div>
           <div className="self-start rounded-full bg-blue-100 px-12 py-6 text-lg">
             {`Let me know `}
-            <span role="img" aria-label="victory hand emoji">
-              ✌️
-            </span>
+            ✌️
           </div>
         </div>
 
@@ -79,9 +76,7 @@ function DiscordSection() {
           </div>
           <div className="self-end rounded-full bg-green-100 px-12 py-6 text-lg">
             {`Let me show you what I'm working on...`}
-            <span role="img" aria-label="technologist emoji">
-              🧑‍💻
-            </span>
+            🧑‍💻
           </div>
         </div>
       </div>

@@ -1,13 +1,11 @@
-import * as React from 'react'
-import clsx from 'clsx'
-import type {ImageBuilder} from '~/images'
-import {getImgProps} from '~/images'
-import {Grid} from '../grid'
-import {H2, H6} from '../typography'
-import {ArrowLink} from '../arrow-button'
-import {ClipboardCopyButton} from '../clipboard-copy-button'
-import type {Team} from '~/types'
-import {BlurrableImage} from '../blurrable-image'
+import {clsx} from 'clsx'
+import {getImgProps, type ImageBuilder} from '~/images.tsx'
+import {type Team} from '~/types.ts'
+import {ArrowLink} from '../arrow-button.tsx'
+import {BlurrableImage} from '../blurrable-image.tsx'
+import {ClipboardCopyButton} from '../clipboard-copy-button.tsx'
+import {Grid} from '../grid.tsx'
+import {H2, H6} from '../typography.tsx'
 
 type FeaturedSectionProps = {
   caption?: string
@@ -48,8 +46,8 @@ function FeaturedSection({
 }: FeaturedSectionProps) {
   const img = imageBuilder ? (
     <img
-      className="rounded-lg object-cover object-center"
       {...getImgProps(imageBuilder, {
+        className: 'rounded-lg object-cover object-center',
         widths: [300, 600, 900, 1700, 2500],
         sizes: [
           '(max-width: 1023px) 80vw',
@@ -85,7 +83,7 @@ function FeaturedSection({
                   {title}
                 </H2>
 
-                <div className="mt-6 text-xl font-medium text-blueGray-500">
+                <div className="mt-6 text-xl font-medium text-slate-500">
                   {subTitle}
                 </div>
               </div>
@@ -104,12 +102,10 @@ function FeaturedSection({
                 <BlurrableImage
                   blurDataUrl={blurDataUrl}
                   img={img}
-                  className="aspect-w-4 aspect-h-3 lg:aspect-h-5 lg:aspect-w-4"
+                  className="aspect-[4/3] lg:aspect-[4/5]"
                 />
               ) : (
-                <div className="aspect-w-4 aspect-h-3 lg:aspect-h-5 lg:aspect-w-4">
-                  {img}
-                </div>
+                <div className="aspect-[4/3] lg:aspect-[4/5]">{img}</div>
               )}
               {leadingTeam ? (
                 <div className="absolute left-6 top-6 z-20 h-4 w-4 rounded-full bg-team-current p-1" />

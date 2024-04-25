@@ -1,8 +1,8 @@
-import {json} from 'remix'
-import {getErrorMessage} from '~/utils/misc'
-import {deleteConvertKitCache} from '~/utils/user-info.server'
-import * as ck from './convertkit.server'
-import type {Errors, Fields, ActionData} from './types'
+import {json} from '@remix-run/node'
+import {getErrorMessage} from '~/utils/misc.tsx'
+import {deleteConvertKitCache} from '~/utils/user-info.server.ts'
+import * as ck from './convertkit.server.ts'
+import {type ActionData, type Errors, type Fields} from './types.ts'
 
 function getErrorForFirstName(name: string | null) {
   if (!name) return `Name is required`
@@ -55,6 +55,7 @@ async function handleConvertKitFormSubmission(request: Request) {
     email: form.get('email') ?? '',
     convertKitTagId: form.get('convertKitTagId') ?? '',
     convertKitFormId: form.get('convertKitFormId') ?? '',
+    url: form.get('url'),
   }
 
   const errors: Errors = {
@@ -67,6 +68,13 @@ async function handleConvertKitFormSubmission(request: Request) {
       fields.convertKitFormId,
       form,
     ),
+    url: null,
+  }
+
+  const failedHoneypot = Boolean(fields.url)
+  if (failedHoneypot) {
+    console.info(`FAILED HONEYPOT`, fields)
+    return json({status: 'success'})
   }
 
   let data: ActionData

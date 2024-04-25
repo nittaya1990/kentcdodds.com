@@ -1,20 +1,29 @@
-import type {
-  SimplecastCollectionResponse,
-  SimpelcastSeasonListItem,
-  SimplecastEpisode,
-  SimplecastTooManyRequests,
-  SimplecastEpisodeListItem,
-  CWKEpisode,
-  CWKSeason,
-} from '~/types'
-import {omit, sortBy} from 'lodash'
-import type * as U from 'unist'
-import type * as M from 'mdast'
 import type * as H from 'hast'
-import {getRequiredServerEnvVar, typedBoolean} from './misc'
-import {markdownToHtml, stripHtml} from './markdown.server'
-import {redisCache} from './redis.server'
-import {cachified} from './cache.server'
+import {toHtml as hastToHtml} from 'hast-util-to-html'
+import type * as M from 'mdast'
+import {toHast as mdastToHast} from 'mdast-util-to-hast'
+import parseHtml from 'rehype-parse'
+import rehype2remark from 'rehype-remark'
+import rehypeStringify from 'rehype-stringify'
+import parseMarkdown from 'remark-parse'
+import remark2rehype from 'remark-rehype'
+import {unified} from 'unified'
+import type * as U from 'unist'
+import {visit} from 'unist-util-visit'
+import {
+  type CWKEpisode,
+  type CWKSeason,
+  type SimpelcastSeasonListItem,
+  type SimplecastCollectionResponse,
+  type SimplecastEpisode,
+  type SimplecastEpisodeListItem,
+  type SimplecastTooManyRequests,
+} from '~/types.ts'
+import {omit, sortBy} from '~/utils/cjs/lodash.js'
+import {cache, cachified} from './cache.server.ts'
+import {markdownToHtml, stripHtml} from './markdown.server.ts'
+import {getRequiredServerEnvVar, typedBoolean} from './misc.tsx'
+import {type Timings} from './timing.server.ts'
 
 const SIMPLECAST_KEY = getRequiredServerEnvVar('SIMPLECAST_KEY')
 const CHATS_WITH_KENT_PODCAST_ID = getRequiredServerEnvVar(
@@ -38,16 +47,23 @@ function isTooManyRequests(json: unknown): json is SimplecastTooManyRequests {
 const getCachedSeasons = async ({
   request,
   forceFresh,
+  timings,
 }: {
   request: Request
   forceFresh?: boolean
+  timings?: Timings
 }) =>
   cachified({
-    cache: redisCache,
-    key: seasonsCacheKey,
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-    getFreshValue: () => getSeasons({request, forceFresh}),
+    cache,
     request,
+    timings,
+    key: seasonsCacheKey,
+    // while we're actively publishing the podcast, let's have the cache be
+    // shorter
+    ttl: 1000 * 60 * 5,
+    // ttl: 1000 * 60 * 60 * 24 * 7,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
+    getFreshValue: () => getSeasons({request, forceFresh, timings}),
     forceFresh,
     checkValue: (value: unknown) =>
       Array.isArray(value) &&
@@ -57,33 +73,41 @@ const getCachedSeasons = async ({
       ),
   })
 
-const getCachedEpisode = async (
+async function getCachedEpisode(
   episodeId: string,
   {
     request,
     forceFresh,
+    timings,
   }: {
     request: Request
     forceFresh?: boolean
+    timings?: Timings
   },
-) =>
-  cachified({
-    cache: redisCache,
-    key: `simplecast:episode:${episodeId}`,
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-    getFreshValue: () => getEpisode(episodeId),
+) {
+  const key = `simplecast:episode:${episodeId}`
+  return cachified({
+    cache,
     request,
+    timings,
+    key,
+    ttl: 1000 * 60 * 60 * 24 * 7,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
+    getFreshValue: () => getEpisode(episodeId),
     forceFresh,
     checkValue: (value: unknown) =>
       typeof value === 'object' && value !== null && 'title' in value,
   })
+}
 
 async function getSeasons({
   request,
   forceFresh,
+  timings,
 }: {
   request: Request
   forceFresh?: boolean
+  timings?: Timings
 }) {
   const res = await fetch(
     `https://api.simplecast.com/podcasts/${CHATS_WITH_KENT_PODCAST_ID}/seasons`,
@@ -106,7 +130,11 @@ async function getSeasons({
         )
         return
       }
-      const episodes = await getEpisodes(seasonId, {request, forceFresh})
+      const episodes = await getEpisodes(seasonId, {
+        request,
+        forceFresh,
+        timings,
+      })
       if (!episodes.length) return null
 
       return {seasonNumber: number, episodes}
@@ -121,9 +149,11 @@ async function getEpisodes(
   {
     request,
     forceFresh,
+    timings,
   }: {
     request: Request
     forceFresh?: boolean
+    timings?: Timings
   },
 ) {
   const url = new URL(`https://api.simplecast.com/seasons/${seasonId}/episodes`)
@@ -140,7 +170,7 @@ async function getEpisodes(
   const episodes = await Promise.all(
     collection
       .filter(({status, is_hidden}) => status === 'published' && !is_hidden)
-      .map(({id}) => getCachedEpisode(id, {request, forceFresh})),
+      .map(({id}) => getCachedEpisode(id, {request, forceFresh, timings})),
   )
   return episodes.filter(typedBoolean)
 }
@@ -220,34 +250,24 @@ function removeEls<ItemType>(array: Array<ItemType>, ...els: Array<ItemType>) {
   return array.filter(el => !els.includes(el))
 }
 
-interface Link extends H.Parent {
-  /**
-   * Represents this variant of a Node.
-   */
-  type: 'link'
-
-  /**
-   * Represents the destination of the link.
-   */
-  url: string
-}
-
 function autoAffiliates() {
   return async function affiliateTransformer(tree: H.Root) {
-    const {visit} = await import('unist-util-visit')
-    visit(tree, 'link', function visitor(linkNode: Link) {
-      if (linkNode.url.includes('amazon.com')) {
-        const amazonUrl = new URL(linkNode.url)
+    visit(tree, 'element', function visitor(linkNode: H.Element) {
+      if (linkNode.tagName !== 'a') return
+      if (!linkNode.properties) return
+      if (typeof linkNode.properties.href !== 'string') return
+      if (linkNode.properties.href.includes('amazon.com')) {
+        const amazonUrl = new URL(linkNode.properties.href)
         if (!amazonUrl.searchParams.has('tag')) {
           amazonUrl.searchParams.set('tag', 'kentcdodds-20')
-          linkNode.url = amazonUrl.toString()
+          linkNode.properties.href = amazonUrl.toString()
         }
       }
-      if (linkNode.url.includes('egghead.io')) {
-        const eggheadUrl = new URL(linkNode.url)
+      if (linkNode.properties.href.includes('egghead.io')) {
+        const eggheadUrl = new URL(linkNode.properties.href)
         if (!eggheadUrl.searchParams.has('af')) {
           eggheadUrl.searchParams.set('af', '5236ad')
-          linkNode.url = eggheadUrl.toString()
+          linkNode.properties.href = eggheadUrl.toString()
         }
       }
     })
@@ -260,16 +280,6 @@ async function parseSummaryMarkdown(
 ): Promise<
   Pick<CWKEpisode, 'summaryHTML' | 'resources' | 'guests' | 'homeworkHTMLs'>
 > {
-  const {unified} = await import('unified')
-  const {default: parseHtml} = await import('rehype-parse')
-  const {default: parseMarkdown} = await import('remark-parse')
-  const {default: remark2rehype} = await import('remark-rehype')
-  const {default: rehype2remark} = await import('rehype-remark')
-  const {default: rehypeStringify} = await import('rehype-stringify')
-  const {toHast: mdastToHast} = await import('mdast-util-to-hast')
-  const {toHtml: hastToHtml} = await import('hast-util-to-html')
-  const {visit} = await import('unist-util-visit')
-
   const isHTMLInput = summaryInput.trim().startsWith('<')
   const resources: CWKEpisode['resources'] = []
   const guests: CWKEpisode['guests'] = []
@@ -279,9 +289,8 @@ async function parseSummaryMarkdown(
     // @ts-expect-error not sure why typescript doesn't like these plugins
     .use(isHTMLInput ? parseHtml : parseMarkdown)
     .use(isHTMLInput ? rehype2remark : () => {})
-    .use(autoAffiliates)
     .use(function extractMetaData() {
-      return function transformer(tree) {
+      return function transformer(tree: M.Root) {
         type Section = {
           children: Array<U.Node>
           remove: () => void
@@ -379,7 +388,7 @@ async function parseSummaryMarkdown(
           if (/^guest/i.test(sectionTitle)) {
             remove()
             for (const child of children) {
-              let company, github, twitter
+              let company, github, x
               visit(child, 'listItem', (listItem: M.ListItem) => {
                 // this error handling makes me laugh and cry
                 // definitely better error messages than we'd get
@@ -426,14 +435,20 @@ async function parseSummaryMarkdown(
                   github = name.replace('@', '')
                 }
                 if (/twitter/i.test(type)) {
-                  twitter = name.replace('@', '')
+                  x = name.replace('@', '')
+                }
+                if (/x/i.test(type)) {
+                  x = name.replace('@', '')
+                }
+                if (/𝕏/i.test(type)) {
+                  x = name.replace('@', '')
                 }
               })
               guests.push({
                 name: sectionTitle.replace(/^guest:?/i, '').trim(),
                 company,
                 github,
-                twitter,
+                x,
               })
             }
           }
@@ -446,6 +461,7 @@ async function parseSummaryMarkdown(
       }
     })
     .use(remark2rehype)
+    .use(autoAffiliates)
     .use(rehypeStringify)
     .process(summaryInput)
 
@@ -461,11 +477,13 @@ async function parseSummaryMarkdown(
 async function getSeasonListItems({
   request,
   forceFresh,
+  timings,
 }: {
   request: Request
   forceFresh?: boolean
+  timings?: Timings
 }) {
-  const seasons = await getCachedSeasons({request, forceFresh})
+  const seasons = await getCachedSeasons({request, forceFresh, timings})
   const listItemSeasons: Array<CWKSeason> = []
   for (const season of seasons) {
     listItemSeasons.push({
@@ -486,4 +504,4 @@ async function getSeasonListItems({
   return listItemSeasons
 }
 
-export {getCachedSeasons as getSeasons, getSeasonListItems}
+export {getSeasonListItems, getCachedSeasons as getSeasons}

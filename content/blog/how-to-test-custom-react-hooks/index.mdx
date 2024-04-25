@@ -247,7 +247,7 @@ test('allows you to undo and redo', () => {
 
   // add second value
   input.value = 'two'
-  userEvent.click(submit)
+  await userEvent.click(submit)
 
   // assert new state
   expect(undo).not.toBeDisabled()
@@ -258,7 +258,7 @@ test('allows you to undo and redo', () => {
 
   // add third value
   input.value = 'three'
-  userEvent.click(submit)
+  await userEvent.click(submit)
 
   // assert new state
   expect(undo).not.toBeDisabled()
@@ -268,7 +268,7 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future:`)
 
   // undo
-  userEvent.click(undo)
+  await userEvent.click(undo)
 
   // assert "undone" state
   expect(undo).not.toBeDisabled()
@@ -278,7 +278,7 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future: three`)
 
   // undo again
-  userEvent.click(undo)
+  await userEvent.click(undo)
 
   // assert "double-undone" state
   expect(undo).toBeDisabled()
@@ -288,7 +288,7 @@ test('allows you to undo and redo', () => {
   expect(future).toHaveTextContent(`Future: two, three`)
 
   // redo
-  userEvent.click(redo)
+  await userEvent.click(redo)
 
   // assert undo + undo + redo state
   expect(undo).not.toBeDisabled()
@@ -299,7 +299,7 @@ test('allows you to undo and redo', () => {
 
   // add fourth value
   input.value = 'four'
-  userEvent.click(submit)
+  await userEvent.click(submit)
 
   // assert final state (note the lack of "third")
   expect(undo).not.toBeDisabled()
@@ -438,13 +438,12 @@ the hook with different props etc. Each of these use cases complicates your
 `setup` function or your real world example which will make it even more
 domain-specific and difficult to follow.
 
-This is why
-[`@testing-library/react-hooks`](https://github.com/testing-library/react-hooks-testing-library)
-exists. Here's what this test would be like if we use
-`@testing-library/react-hooks`:
+This is why `renderHook` from
+[`@testing-library/react`](https://github.com/testing-library/react-testing-library)
+exists. Here's what this test would be like if we use `@testing-library/react`:
 
 ```js
-import {renderHook, act} from '@testing-library/react-hooks'
+import {renderHook, act} from '@testing-library/react'
 import useUndo from '../use-undo'
 
 test('allows you to undo and redo', () => {
@@ -532,9 +531,8 @@ test('allows you to undo and redo', () => {
 ```
 
 You'll notice it's very similar to our custom `setup` function. Under the hood,
-`@testing-library/react-hooks` is doing something very similar to our original
-`setup` function above. A few other things we get from
-`@testing-library/react-hooks` are:
+`@testing-library/react` is doing something very similar to our original `setup`
+function above. A few other things we get from `@testing-library/react` are:
 
 - Utility to "rerender" the component that's rendering the hook (to test effect
   dependency changes for example)
@@ -557,5 +555,5 @@ testing your test components than the hook you're trying to test.
 To be clear, if I were writing and testing the specific `useUndo` hook, I would
 go with the real-world example usage. I think it makes the best trade-off
 between understandability and coverage of our use cases. But there are
-definitely more complicated hooks where using `@testing-library/react-hooks` is
-more useful.
+definitely more complicated hooks where using `@testing-library/react` is more
+useful.

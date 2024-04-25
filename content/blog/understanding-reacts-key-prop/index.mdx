@@ -46,7 +46,7 @@ Now try this one:
 That's working as expected now. Here's the implementation, and I'll highlight
 the difference:
 
-```tsx [21]
+```tsx lines=21
 const defaultValuesByTopic = {
   training: 'I would like some training',
   consulting: 'I have consulting needs',
@@ -170,7 +170,7 @@ function Counter() {
 
 function CounterParent() {
   // using useReducer this way basically ensures that any time you call
-  // setCounterKey, the `counterKey` is set to a new object which will
+  // setCounterKey, the `counterKey` is set to a new value which will
   // make the `key` different resulting in React unmounting the previous
   // component and mounting a new one.
   const [counterKey, setCounterKey] = React.useReducer(c => c + 1, 0)

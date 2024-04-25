@@ -1,5 +1,5 @@
-import {cachified} from './cache.server'
-import {redisCache} from './redis.server'
+import {cache, cachified} from './cache.server.ts'
+import {type Timings} from './timing.server.ts'
 
 type TiToDiscount = {
   code: string
@@ -25,6 +25,8 @@ type TiToEvent = {
 type TiToRelease = {
   quantity: number
   tickets_count: number
+  end_at?: string
+  expired: boolean
 }
 type TiToEventDetails = {
   location: string
@@ -49,6 +51,8 @@ type WorkshopEvent = Pick<TiToEvent, 'description' | 'title' | 'url'> &
     date: TiToEventDetails['date_or_range']
     startTime: TiToActivity['start_at']
     endTime: TiToActivity['end_at']
+    expired: boolean
+    salesEndTime: string | undefined
   }
 
 const titoSecret = process.env.TITO_API_SECRET
@@ -58,17 +62,29 @@ if (!titoSecret && process.env.NODE_ENV === 'production') {
   )
 }
 
+async function getTitoAccounts<
+  JsonResponse extends Record<string, unknown>,
+>(): Promise<JsonResponse> {
+  const response = await fetch(`https://api.tito.io/v3/hello`, {
+    headers: {Authorization: `Bearer ${titoSecret}`},
+  })
+  return response.json()
+}
+
 async function getTito<JsonResponse extends Record<string, unknown>>(
+  account: string,
   endpoint: string,
 ): Promise<JsonResponse> {
   const response = await fetch(
-    `https://api.tito.io/v3/kent-c-dodds/${endpoint}`,
+    `https://api.tito.io/v3/${encodeURIComponent(account)}/${encodeURIComponent(
+      endpoint,
+    )}`,
     {headers: {Authorization: `Bearer ${titoSecret}`}},
   )
   return response.json()
 }
 
-function getDiscounts(codes: Array<TiToDiscount>) {
+function getDiscounts(codes: Array<TiToDiscount> = []) {
   const dis: Record<string, {url: string; ends: string}> = {}
   for (const discount of codes) {
     const isEarly = discount.code === 'early'
@@ -87,7 +103,16 @@ function getDiscounts(codes: Array<TiToDiscount>) {
 async function getScheduledEvents() {
   if (!titoSecret) return []
 
+  const accounts = await getTitoAccounts<{accounts: Array<string>}>()
+  const events = await Promise.all(
+    accounts.accounts.map(getScheduledEventsForAccount),
+  )
+  return events.flat()
+}
+
+async function getScheduledEventsForAccount(account: string) {
   const {events: allEvents} = await getTito<{events: Array<TiToEvent>}>(
+    account,
     'events',
   )
   const liveEvents = allEvents.filter(event => {
@@ -107,13 +132,17 @@ async function getScheduledEvents() {
         metadata,
       }): Promise<WorkshopEvent> => {
         const [event, discounts, activity] = await Promise.all([
-          getTito<{event: TiToEventDetails}>(`${slug}`).then(r => r.event),
-          getTito<{discount_codes: Array<TiToDiscount>}>(
+          getTito<{event: TiToEventDetails}>(account, `${slug}`).then(
+            r => r.event,
+          ),
+          getTito<{discount_codes?: Array<TiToDiscount>}>(
+            account,
             `${slug}/discount_codes`,
           ).then(r => getDiscounts(r.discount_codes)),
-          getTito<{activities: Array<TiToActivity>}>(`${slug}/activities`).then(
-            r => r.activities[0],
-          ),
+          getTito<{activities?: Array<TiToActivity>}>(
+            account,
+            `${slug}/activities`,
+          ).then(r => r.activities?.[0]),
         ])
 
         const eventInfo = {
@@ -133,6 +162,12 @@ async function getScheduledEvents() {
           date: event.date_or_range,
           startTime: activity?.start_at,
           endTime: activity?.end_at,
+          expired: event.releases.every(release => release.expired),
+          salesEndTime: event.releases
+            .map(release => release.end_at)
+            .filter(Boolean)
+            .sort()
+            .pop(),
         }
 
         for (const release of event.releases) {
@@ -152,18 +187,23 @@ async function getScheduledEvents() {
 async function getCachedScheduledEvents({
   request,
   forceFresh,
+  timings,
 }: {
   request: Request
   forceFresh?: boolean
+  timings: Timings
 }) {
+  const key = 'tito:scheduled-events'
   const scheduledEvents = await cachified({
-    key: 'tito:scheduled-events',
-    cache: redisCache,
+    key,
+    cache,
+    request,
+    timings,
     getFreshValue: getScheduledEvents,
     checkValue: (value: unknown) => Array.isArray(value),
-    request,
     forceFresh,
-    maxAge: 1000 * 60 * 24,
+    ttl: 1000 * 60 * 24,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
   })
   return scheduledEvents
 }
@@ -172,14 +212,18 @@ async function getCachedScheduledEvents({
 function getScheduledEventsIgnoreErrors({
   request,
   forceFresh,
+  timings,
 }: {
   request: Request
   forceFresh?: boolean
+  timings: Timings
 }) {
-  return getCachedScheduledEvents({request, forceFresh}).catch(error => {
-    console.error('There was a problem retrieving ti.to info', error)
-    return []
-  })
+  return getCachedScheduledEvents({request, forceFresh, timings}).catch(
+    error => {
+      console.error('There was a problem retrieving ti.to info', error)
+      return []
+    },
+  )
 }
 
 export {getScheduledEventsIgnoreErrors as getScheduledEvents}

@@ -12,6 +12,17 @@ meta:
     - React.memo
     - re-renders
     - performance
+translations:
+  - language: Português (Brasil)
+    link: https://dev.to/ronaizacardoso/um-simples-truque-para-otimizar-as-re-renderizacoes-no-react-bo0
+    author:
+      name: ronaiza
+      link: https://github.com/ronaiza-cardoso
+  - language: 한국어
+    link: https://dkrnfls.tistory.com/413
+    author:
+      name: 정우병
+      link: https://github.com/woobottle
 bannerCloudinaryId: kentcdodds.com/content/blog/optimize-react-re-renders/banner
 bannerCredit: Photo by [Evan Dvorkin](https://unsplash.com/photos/wDCq6GSvMps)
 ---
@@ -143,7 +154,7 @@ These are called UI descriptor objects. They describe the UI that React should
 create in the DOM (or via native components for react native). Let's click the
 button and take a look at the changes:
 
-```js [8,9]
+```js lines=8,9
 const counterElement = {
   type: 'div',
   props: {
@@ -176,7 +187,7 @@ It may actually be easier to investigate at the parts of this tree of React
 elements is the same between renders, so here are the things that did NOT change
 between those two renders:
 
-```js [2,6,13,15]
+```js lines=2,6,13,15
 const counterElement = {
   type: 'div',
   props: {
@@ -256,7 +267,7 @@ ReactDOM.render(
 
 So let's checkout the _things that are the same_ between renders:
 
-```js [2,6,12-17]
+```js lines=2,6,12-17
 const counterElement = {
   type: 'div',
   props: {

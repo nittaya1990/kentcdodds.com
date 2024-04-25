@@ -1,12 +1,12 @@
-import * as React from 'react'
-import {Link} from 'remix'
+import {Link} from '@remix-run/react'
+import {clsx} from 'clsx'
 import {motion, useReducedMotion} from 'framer-motion'
-import clsx from 'clsx'
-import type {Team} from '@prisma/client'
-import {useRootData} from '~/utils/use-root-data'
-import {useTeam} from '~/utils/team-provider'
-import {kodyProfiles} from '~/images'
-import {formatNumber} from '~/utils/misc'
+import * as React from 'react'
+import {kodyProfiles} from '~/images.tsx'
+import {type Team} from '~/types.ts'
+import {formatNumber, getOptionalTeam} from '~/utils/misc.tsx'
+import {useTeam} from '~/utils/team-provider.tsx'
+import {useOptionalUser, useRootData} from '~/utils/use-root-data.ts'
 
 const barColors: Record<Team, string> = {
   RED: 'bg-team-red',
@@ -36,7 +36,9 @@ function Stat({
 }) {
   const {userInfo} = useRootData()
   const [currentTeam] = useTeam()
-  const avatar = userInfo ? userInfo.avatar : kodyProfiles[team]
+  const avatar = userInfo
+    ? userInfo.avatar
+    : kodyProfiles[getOptionalTeam(team)]
   const isUsersTeam = team === currentTeam
 
   const MotionEl = onClick ? motion.button : motion.div
@@ -56,7 +58,7 @@ function Stat({
       initial="initial"
       whileHover="hover"
       whileFocus="hover"
-      className="focus:outline-none relative flex origin-right items-center justify-center"
+      className="relative flex origin-right items-center justify-center focus:outline-none"
       transition={transition}
       variants={{
         initial: {width: 22},
@@ -153,6 +155,7 @@ function TeamStats({
   pull: 'left' | 'right'
   onStatClick?: (team: Team) => void
 }) {
+  const optionalUser = useOptionalUser()
   const [altDown, setAltDown] = React.useState(false)
   const [team] = useTeam()
 
@@ -165,6 +168,19 @@ function TeamStats({
       document.removeEventListener('keydown', set)
     }
   }, [])
+
+  const loginLink = optionalUser ? null : (
+    <div
+      className={clsx('text-center', {
+        'mb-2': direction === 'down',
+        'mt-2': direction === 'up',
+      })}
+    >
+      <Link to="/login" className="underlined">
+        Login
+      </Link>
+    </div>
+  )
 
   return (
     <div
@@ -184,7 +200,8 @@ function TeamStats({
             'right-0': pull === 'right',
             'left-0': pull === 'left',
             '-top-9': direction === 'down',
-            '-bottom-20': direction === 'up',
+            '-bottom-20': !loginLink && direction === 'up',
+            '-bottom-9': loginLink && direction === 'up',
           },
         )}
       >
@@ -198,6 +215,7 @@ function TeamStats({
           {`what's this?`}
         </Link>
       </div>
+      {direction === 'down' ? loginLink : null}
       <ul
         className={clsx(
           'relative flex h-0 overflow-visible border-team-current px-4',
@@ -222,6 +240,7 @@ function TeamStats({
           </li>
         ))}
       </ul>
+      {direction === 'up' ? loginLink : null}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import {useRef, useEffect, useState, RefCallback, useCallback} from 'react'
+import {useCallback, useEffect, useRef, useState, type RefCallback} from 'react'
 
 export type ElementState = 'active' | 'focus' | 'hover' | 'initial'
 

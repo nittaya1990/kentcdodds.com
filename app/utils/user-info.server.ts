@@ -1,11 +1,10 @@
-import type {User} from '~/types'
-import {getImageBuilder, images} from '../images'
-import * as ck from '../convertkit/convertkit.server'
-import * as discord from './discord.server'
-import type {Timings} from './metrics.server'
-import {getAvatar, getDomainUrl} from './misc'
-import {redisCache} from './redis.server'
-import {cachified} from './cache.server'
+import {type User} from '~/types.ts'
+import * as ck from '../convertkit/convertkit.server.ts'
+import {getImageBuilder, images} from '../images.tsx'
+import {cache, cachified} from './cache.server.ts'
+import * as discord from './discord.server.ts'
+import {getAvatar, getOptionalTeam} from './misc.tsx'
+import {type Timings} from './timing.server.ts'
 
 type UserInfo = {
   avatar: {
@@ -21,13 +20,74 @@ type UserInfo = {
   } | null
 }
 
+function abortTimeoutSignal(timeMs: number) {
+  const abortController = new AbortController()
+  void new Promise(resolve => setTimeout(resolve, timeMs)).then(() => {
+    abortController.abort()
+  })
+  return abortController.signal
+}
+
+export async function gravatarExistsForEmail({
+  email,
+  request,
+  timings,
+  forceFresh,
+}: {
+  email: string
+  request?: Request
+  timings?: Timings
+  forceFresh?: boolean
+}) {
+  return cachified({
+    key: `gravatar-exists-for:${email}`,
+    cache,
+    request,
+    timings,
+    forceFresh,
+    ttl: 1000 * 60 * 60 * 24 * 90,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 365,
+    checkValue: prevValue => typeof prevValue === 'boolean',
+    getFreshValue: async context => {
+      const gravatarUrl = getAvatar(email, {fallback: '404'})
+      try {
+        const avatarResponse = await fetch(gravatarUrl, {
+          method: 'HEAD',
+          signal: abortTimeoutSignal(
+            context.background || forceFresh ? 1000 * 10 : 100,
+          ),
+        })
+        if (avatarResponse.status === 200) {
+          context.metadata.ttl = 1000 * 60 * 60 * 24 * 365
+          return true
+        } else {
+          context.metadata.ttl = 1000 * 60
+          return false
+        }
+      } catch (error: unknown) {
+        console.error(`Error getting gravatar for ${email}:`, error)
+        context.metadata.ttl = 1000 * 60
+        return false
+      }
+    },
+  })
+}
+
 async function getDirectAvatarForUser(
   {email, team}: Pick<User, 'email' | 'team'>,
-  {size = 128, origin}: {size: number; origin?: string},
+  {
+    size = 128,
+    request,
+    timings,
+    forceFresh,
+  }: {size: number; request: Request; timings?: Timings; forceFresh?: boolean},
 ) {
-  const gravatarUrl = getAvatar(email, {fallback: '404', origin})
-  const avatarResponse = await fetch(gravatarUrl, {method: 'HEAD'})
-  const hasGravatar = avatarResponse.status === 200
+  const hasGravatar = await gravatarExistsForEmail({
+    email,
+    request,
+    timings,
+    forceFresh,
+  })
   if (hasGravatar) {
     return {hasGravatar, avatar: getAvatar(email, {size, fallback: null})}
   } else {
@@ -35,10 +95,11 @@ async function getDirectAvatarForUser(
       RED: images.kodyProfileRed.id,
       BLUE: images.kodyProfileBlue.id,
       YELLOW: images.kodyProfileYellow.id,
+      UNKNOWN: images.kodyProfileGray.id,
     }
     return {
       hasGravatar,
-      avatar: getImageBuilder(imageProfileIds[team])({
+      avatar: getImageBuilder(imageProfileIds[getOptionalTeam(team)])({
         resize: {
           type: 'pad',
           width: size,
@@ -65,10 +126,12 @@ async function getUserInfo(
   const [discordUser, convertKitInfo] = await Promise.all([
     discordId
       ? cachified({
-          cache: redisCache,
+          cache,
           request,
+          timings,
           forceFresh,
-          maxAge: 1000 * 60 * 60 * 24 * 30,
+          ttl: 1000 * 60 * 60 * 24 * 30,
+          staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
           key: getDiscordCacheKey(discordId),
           checkValue: (value: unknown) =>
             typeof value === 'object' && value !== null && 'id' in value,
@@ -80,11 +143,12 @@ async function getUserInfo(
       : null,
     convertKitId
       ? cachified({
-          cache: redisCache,
+          cache,
           request,
-          forceFresh,
-          maxAge: 1000 * 60 * 60 * 24 * 30,
           timings,
+          forceFresh,
+          ttl: 1000 * 60 * 60 * 24 * 30,
+          staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
           key: getConvertKitCacheKey(convertKitId),
           checkValue: (value: unknown) =>
             typeof value === 'object' && value !== null && 'tags' in value,
@@ -106,7 +170,8 @@ async function getUserInfo(
 
   const {avatar, hasGravatar} = await getDirectAvatarForUser(user, {
     size: 128,
-    origin: getDomainUrl(request),
+    request,
+    timings,
   })
   const userInfo: UserInfo = {
     avatar: {
@@ -120,12 +185,12 @@ async function getUserInfo(
   return userInfo
 }
 
-function deleteConvertKitCache(convertKitId: string | number) {
-  return redisCache.del(getConvertKitCacheKey(String(convertKitId)))
+async function deleteConvertKitCache(convertKitId: string | number) {
+  await cache.delete(getConvertKitCacheKey(String(convertKitId)))
 }
 
-function deleteDiscordCache(discordId: string) {
-  return redisCache.del(getDiscordCacheKey(discordId))
+async function deleteDiscordCache(discordId: string) {
+  await cache.delete(getDiscordCacheKey(discordId))
 }
 
 export {

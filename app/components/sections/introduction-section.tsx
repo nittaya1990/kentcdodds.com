@@ -1,10 +1,12 @@
-import * as React from 'react'
-import {Link, useSearchParams} from 'remix'
-import {getImgProps, images} from '~/images'
-import {H2, H3} from '../typography'
-import {ArrowLink} from '../arrow-button'
-import {Grid} from '../grid'
-import {FullScreenYouTubeEmbed, LiteYouTubeEmbed} from '../fullscreen-yt-embed'
+import {Link, useSearchParams} from '@remix-run/react'
+import {getImgProps, images} from '~/images.tsx'
+import {ArrowLink} from '../arrow-button.tsx'
+import {
+  FullScreenYouTubeEmbed,
+  LiteYouTubeEmbed,
+} from '../fullscreen-yt-embed.tsx'
+import {Grid} from '../grid.tsx'
+import {H2, H3} from '../typography.tsx'
 
 function IntroductionSection() {
   const [searchParams] = useSearchParams()
@@ -16,6 +18,7 @@ function IntroductionSection() {
           img={
             <img
               {...getImgProps(images.getToKnowKentVideoThumbnail, {
+                className: 'rounded-lg object-cover w-full',
                 widths: [256, 550, 700, 900, 1300, 1800],
                 sizes: [
                   '(max-width: 320px) 256px',
@@ -24,7 +27,6 @@ function IntroductionSection() {
                   '850px',
                 ],
               })}
-              className="rounded-lg object-cover"
             />
           }
           ytLiteEmbed={

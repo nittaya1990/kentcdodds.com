@@ -1,40 +1,41 @@
-import * as React from 'react'
-import type {
-  HeadersFunction,
-  LinksFunction,
-  LoaderFunction,
-  MetaFunction,
-} from 'remix'
-import {json, useLoaderData, useSearchParams} from 'remix'
-import {shuffle} from 'lodash'
-import formatDate from 'date-fns/format'
-import parseDate from 'date-fns/parseISO'
-import type {Await, MdxListItem} from '~/types'
-import {useRootData} from '~/utils/use-root-data'
-import {getImgProps, getSocialImageWithPreTitle, images} from '~/images'
-import {H2, H3, H6, Paragraph} from '~/components/typography'
-import {ArrowLink} from '~/components/arrow-button'
-import {Grid} from '~/components/grid'
-import {HeaderSection} from '~/components/sections/header-section'
-import {FeatureCard} from '~/components/feature-card'
-import {UsersIcon} from '~/components/icons/users-icon'
-import {BlogSection} from '~/components/sections/blog-section'
-import {getBlogRecommendations} from '~/utils/blog.server'
-import {HeroSection} from '~/components/sections/hero-section'
-import {getDisplayUrl, getUrl, reuseUsefulLoaderHeaders} from '~/utils/misc'
+import {
+  json,
+  type HeadersFunction,
+  type LinksFunction,
+  type LoaderFunction,
+  type MetaFunction,
+} from '@remix-run/node'
+import {useLoaderData, useSearchParams} from '@remix-run/react'
+import {shuffle} from '~/utils/cjs/lodash.js'
+import {ArrowLink} from '~/components/arrow-button.tsx'
+import {FeatureCard} from '~/components/feature-card.tsx'
 import {
   FullScreenYouTubeEmbed,
   LiteYouTubeEmbed,
   links as youTubeEmbedLinks,
-} from '~/components/fullscreen-yt-embed'
-import {getTalksAndTags} from '~/utils/talks.server'
-import {AwardIcon} from '~/components/icons/award-icon'
-import {MugIcon} from '~/components/icons/mug-icon'
-import {BadgeIcon} from '~/components/icons/badge-icon'
-import {BookIcon} from '~/components/icons/book-icon'
-import {FastForwardIcon} from '~/components/icons/fast-forward-icon'
-import {getSocialMetas} from '~/utils/seo'
-import type {LoaderData as RootLoaderData} from '../root'
+} from '~/components/fullscreen-yt-embed.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {
+  AwardIcon,
+  BadgeIcon,
+  BookIcon,
+  FastForwardIcon,
+  MugIcon,
+  UsersIcon,
+} from '~/components/icons.tsx'
+import {BlogSection} from '~/components/sections/blog-section.tsx'
+import {HeaderSection} from '~/components/sections/header-section.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {H2, H3, H6, Paragraph} from '~/components/typography.tsx'
+import {getImgProps, getSocialImageWithPreTitle, images} from '~/images.tsx'
+import {type Await, type MdxListItem} from '~/types.ts'
+import {getBlogRecommendations} from '~/utils/blog.server.ts'
+import {getDisplayUrl, getUrl, reuseUsefulLoaderHeaders} from '~/utils/misc.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {getTalksAndTags} from '~/utils/talks.server.ts'
+import {getServerTimeHeader} from '~/utils/timing.server.ts'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {type RootLoaderType} from '~/root.tsx'
 
 type LoaderData = {
   blogRecommendations: Array<MdxListItem>
@@ -42,10 +43,11 @@ type LoaderData = {
 }
 
 export const loader: LoaderFunction = async ({request}) => {
-  const {talks} = await getTalksAndTags({request})
+  const timings = {}
+  const {talks} = await getTalksAndTags({request, timings})
 
   const data: LoaderData = {
-    blogRecommendations: await getBlogRecommendations(request),
+    blogRecommendations: await getBlogRecommendations({request, timings}),
     // they're ordered by date, so we'll grab two random of the first 10.
     talkRecommendations: shuffle(talks.slice(0, 14)).slice(0, 4),
   }
@@ -53,30 +55,30 @@ export const loader: LoaderFunction = async ({request}) => {
     headers: {
       'Cache-Control': 'private, max-age=3600',
       Vary: 'Cookie',
+      'Server-Timing': getServerTimeHeader(timings),
     },
   })
 }
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: 'About Kent C. Dodds',
-      description: 'Get to know Kent C. Dodds',
-      keywords: 'about, kent, kent c. dodds, kent dodds',
-      url: getUrl(requestInfo),
-      image: getSocialImageWithPreTitle({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: 'kent/video-stills/snowboard-butter',
-        preTitle: 'Get to know',
-        title: `Kent C. Dodds`,
-      }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  return getSocialMetas({
+    title: 'About Kent C. Dodds',
+    description: 'Get to know Kent C. Dodds',
+    keywords: 'about, kent, kent c. dodds, kent dodds',
+    url: getUrl(requestInfo),
+    image: getSocialImageWithPreTitle({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: 'kent/video-stills/snowboard-butter',
+      preTitle: 'Get to know',
+      title: `Kent C. Dodds`,
     }),
-  }
+  })
 }
 
 export const links: LinksFunction = () => {
@@ -106,8 +108,8 @@ function AboutIndex() {
             img={
               <img
                 id="about-me"
-                className="rounded-lg object-cover"
                 {...getImgProps(images.getToKnowKentVideoThumbnail, {
+                  className: 'rounded-lg object-cover w-full',
                   widths: [280, 560, 840, 1100, 1300, 2600, 3900],
                   sizes: ['(min-width:1620px) 1280px', '80vw'],
                 })}
@@ -128,7 +130,7 @@ function AboutIndex() {
               />
             }
           />
-          <p className="text-xl text-blueGray-500">{`Get to know me in this full introduction video (8:05)`}</p>
+          <p className="text-xl text-slate-500">{`Get to know me in this full introduction video (8:05)`}</p>
           <a
             className="underlined"
             target="_blank"
@@ -166,8 +168,8 @@ function AboutIndex() {
 
           <div className="w-full lg:pr-12">
             <img
-              className="w-full rounded-lg object-cover"
               {...getImgProps(images.kentWorkingInNature, {
+                className: 'w-full rounded-lg object-cover',
                 widths: [512, 840, 1024, 1680, 2520],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -211,8 +213,8 @@ function AboutIndex() {
         <div className="col-span-full lg:col-span-6 lg:col-start-7">
           <div className="mb-12 lg:mb-0">
             <img
-              className="rounded-lg object-cover"
               {...getImgProps(images.happySnowboarder, {
+                className: 'rounded-lg object-cover',
                 widths: [512, 650, 840, 1024, 1300, 1680, 2000, 2520],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -286,8 +288,8 @@ function AboutIndex() {
         <div className="col-span-full mb-12 lg:mb-20">
           <img
             id="about-me"
-            className="rounded-lg object-cover"
             {...getImgProps(images.kentSpeakingAllThingsOpen, {
+              className: 'rounded-lg object-cover',
               widths: [280, 560, 840, 1100, 1300, 2600, 3900],
               sizes: ['(min-width:1620px) 1280px', '80vw'],
             })}
@@ -297,7 +299,7 @@ function AboutIndex() {
           <div key={talk.slug} className="col-span-full lg:col-span-6">
             <TalkCard
               tags={talk.tags}
-              date={talk.deliveries[0]?.date}
+              dateDisplay={talk.deliveries[0]?.dateDisplay}
               title={talk.title}
               talkUrl={`/talks/${talk.slug}`}
             />
@@ -309,8 +311,8 @@ function AboutIndex() {
         <div className="col-span-full lg:col-span-6 lg:col-start-1">
           <div className="mb-12 lg:mb-0">
             <img
-              className="rounded-lg object-cover"
               {...getImgProps(images.microphoneWithHands, {
+                className: 'rounded-lg object-cover',
                 widths: [512, 650, 840, 1024, 1300, 1680, 2000, 2520],
                 sizes: [
                   '(max-width: 1023px) 80vw',
@@ -349,7 +351,7 @@ function AboutIndex() {
         <div className="col-span-full lg:col-span-6">
           <FeatureCard
             title="I have 11 brothers and sisters"
-            description="Yup! There are 6 boys and 6 girls in my family. I'm second to last. No twins. We all have the same mom and dad. Yes my parents are super heros 🦸‍♀️ 🦸"
+            description="Yup! There are 6 boys and 6 girls in my family. I'm second to last. No twins. We all have the same mom and dad. Yes my parents are super heroes 🦸‍♀️ 🦸"
             icon={<UsersIcon size={48} />}
           />
         </div>
@@ -393,8 +395,8 @@ function AboutIndex() {
       <Grid className="mb-24 lg:mb-64">
         <div className="col-span-full mb-10 lg:col-span-6 lg:col-start-1 lg:mb-0">
           <img
-            className="rounded-lg object-contain"
             {...getImgProps(images.teslaY, {
+              className: 'rounded-lg object-contain',
               widths: [420, 512, 840, 1260, 1024, 1680, 2520],
               sizes: [
                 '(max-width: 1023px) 80vw',
@@ -423,14 +425,17 @@ function AboutIndex() {
   )
 }
 
-interface TalkCardProps {
+function TalkCard({
+  tags,
+  dateDisplay,
+  title,
+  talkUrl,
+}: {
   tags: string[]
-  date?: string
+  dateDisplay?: string
   title: string
   talkUrl: string
-}
-
-function TalkCard({tags, date, title, talkUrl}: TalkCardProps) {
+}) {
   return (
     <div className="bg-secondary text-primary flex h-full w-full flex-col justify-between rounded-lg p-16 pt-20">
       <div>
@@ -446,7 +451,7 @@ function TalkCard({tags, date, title, talkUrl}: TalkCardProps) {
         </div>
 
         <Paragraph as="span" className="mb-5">
-          {date ? formatDate(parseDate(date), 'PPP') : 'to be determined'}
+          {dateDisplay ?? 'TBA'}
         </Paragraph>
 
         <H3 className="mb-5">{title}</H3>

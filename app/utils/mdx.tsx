@@ -1,244 +1,25 @@
+import {type MetaFunction, type TypedResponse} from '@remix-run/node'
+import {LRUCache} from 'lru-cache'
+import * as mdxBundler from 'mdx-bundler/client/index.js'
 import * as React from 'react'
-import {buildImageUrl} from 'cloudinary-build-url'
-import type {LoaderData as RootLoaderData} from '../root'
-import type {GitHubFile, MdxListItem, MdxPage} from '~/types'
-import * as mdxBundler from 'mdx-bundler/client'
-import {compileMdx} from '~/utils/compile-mdx.server'
-import {
-  downloadDirList,
-  downloadMdxFileOrDirectory,
-} from '~/utils/github.server'
-import {AnchorOrLink, getDisplayUrl, getUrl, typedBoolean} from '~/utils/misc'
-import {redisCache} from './redis.server'
-import type {Timings} from './metrics.server'
-import {cachified} from './cache.server'
-import {getSocialMetas} from './seo'
+import {CloudinaryVideo} from '~/components/cloudinary-video.tsx'
+import {ConvertKitForm} from '~/convertkit/form.tsx'
 import {
   getImageBuilder,
   getImgProps,
   getSocialImageWithPreTitle,
-} from '~/images'
-import {Themed} from './theme-provider'
-import {markdownToHtmlUnwrapped, stripHtml} from './markdown.server'
-
-type CachifiedOptions = {
-  forceFresh?: boolean | string
-  request?: Request
-  timings?: Timings
-  maxAge?: number
-  expires?: Date
-}
-
-const defaultMaxAge = 1000 * 60 * 60 * 24 * 30
-
-const getCompiledKey = (contentDir: string, slug: string) =>
-  `${contentDir}:${slug}:compiled`
-const checkCompiledValue = (value: unknown) =>
-  typeof value === 'object' &&
-  (value === null || ('code' in value && 'frontmatter' in value))
-
-async function getMdxPage(
-  {
-    contentDir,
-    slug,
-  }: {
-    contentDir: string
-    slug: string
-  },
-  options: CachifiedOptions,
-): Promise<MdxPage | null> {
-  const key = getCompiledKey(contentDir, slug)
-  const page = await cachified({
-    cache: redisCache,
-    maxAge: defaultMaxAge,
-    ...options,
-    // reusing the same key as compiledMdxCached because we just return that
-    // exact same value. Cachifying this allows us to skip getting the cached files
-    key,
-    checkValue: checkCompiledValue,
-    getFreshValue: async () => {
-      const pageFiles = await downloadMdxFilesCached(contentDir, slug, options)
-      const compiledPage = await compileMdxCached({
-        contentDir,
-        slug,
-        ...pageFiles,
-        options,
-      }).catch(err => {
-        console.error(`Failed to get a fresh value for mdx:`, {
-          contentDir,
-          slug,
-        })
-        return Promise.reject(err)
-      })
-      return compiledPage
-    },
-  })
-  if (!page) {
-    // if there's no page, let's remove it from the cache
-    void redisCache.del(key)
-  }
-  return page
-}
-
-async function getMdxPagesInDirectory(
-  contentDir: string,
-  options: CachifiedOptions,
-) {
-  const dirList = await getMdxDirList(contentDir, options)
-
-  // our octokit throttle plugin will make sure we don't hit the rate limit
-  const pageDatas = await Promise.all(
-    dirList.map(async ({slug}) => {
-      return {
-        ...(await downloadMdxFilesCached(contentDir, slug, options)),
-        slug,
-      }
-    }),
-  )
-
-  const pages = await Promise.all(
-    pageDatas.map(pageData =>
-      compileMdxCached({contentDir, ...pageData, options}),
-    ),
-  )
-  return pages.filter(typedBoolean)
-}
-
-const getDirListKey = (contentDir: string) => `${contentDir}:dir-list`
-
-async function getMdxDirList(contentDir: string, options?: CachifiedOptions) {
-  return cachified({
-    cache: redisCache,
-    maxAge: defaultMaxAge,
-    ...options,
-    key: getDirListKey(contentDir),
-    checkValue: (value: unknown) => Array.isArray(value),
-    getFreshValue: async () => {
-      const fullContentDirPath = `content/${contentDir}`
-      const dirList = (await downloadDirList(fullContentDirPath))
-        .map(({name, path}) => ({
-          name,
-          slug: path
-            .replace(`${fullContentDirPath}/`, '')
-            .replace(/\.mdx$/, ''),
-        }))
-        .filter(({name}) => name !== 'README.md')
-      return dirList
-    },
-  })
-}
-
-const getDownloadKey = (contentDir: string, slug: string) =>
-  `${contentDir}:${slug}:downloaded`
-
-async function downloadMdxFilesCached(
-  contentDir: string,
-  slug: string,
-  options: CachifiedOptions,
-) {
-  const key = getDownloadKey(contentDir, slug)
-  const downloaded = await cachified({
-    cache: redisCache,
-    maxAge: defaultMaxAge,
-    ...options,
-    key,
-    checkValue: (value: unknown) => {
-      if (typeof value !== 'object') {
-        return `value is not an object`
-      }
-      if (value === null) {
-        return `value is null`
-      }
-
-      const download = value as Record<string, unknown>
-      if (!Array.isArray(download.files)) {
-        return `value.files is not an array`
-      }
-      if (typeof download.entry !== 'string') {
-        return `value.entry is not a string`
-      }
-
-      return true
-    },
-    getFreshValue: async () =>
-      downloadMdxFileOrDirectory(`${contentDir}/${slug}`),
-  })
-  // if there aren't any files, remove it from the cache
-  if (!downloaded.files.length) {
-    void redisCache.del(key)
-  }
-  return downloaded
-}
-
-async function compileMdxCached({
-  contentDir,
-  slug,
-  entry,
-  files,
-  options,
-}: {
-  contentDir: string
-  slug: string
-  entry: string
-  files: Array<GitHubFile>
-  options: CachifiedOptions
-}) {
-  const key = getCompiledKey(contentDir, slug)
-  const page = await cachified({
-    cache: redisCache,
-    maxAge: defaultMaxAge,
-    ...options,
-    key,
-    checkValue: checkCompiledValue,
-    getFreshValue: async () => {
-      const compiledPage = await compileMdx<MdxPage['frontmatter']>(slug, files)
-      if (compiledPage) {
-        if (
-          compiledPage.frontmatter.bannerCloudinaryId &&
-          !compiledPage.frontmatter.bannerBlurDataUrl
-        ) {
-          try {
-            compiledPage.frontmatter.bannerBlurDataUrl = await getBlurDataUrl(
-              compiledPage.frontmatter.bannerCloudinaryId,
-            )
-          } catch (error: unknown) {
-            console.error(
-              'oh no, there was an error getting the blur image data url',
-              error,
-            )
-          }
-        }
-        if (compiledPage.frontmatter.bannerCredit) {
-          const credit = await markdownToHtmlUnwrapped(
-            compiledPage.frontmatter.bannerCredit,
-          )
-          compiledPage.frontmatter.bannerCredit = credit
-          const noHtml = await stripHtml(credit)
-          if (!compiledPage.frontmatter.bannerAlt) {
-            compiledPage.frontmatter.bannerAlt = noHtml
-              .replace(/(photo|image)/i, '')
-              .trim()
-          }
-          if (!compiledPage.frontmatter.bannerTitle) {
-            compiledPage.frontmatter.bannerTitle = noHtml
-          }
-        }
-        return {
-          ...compiledPage,
-          slug,
-          editLink: `https://github.com/kentcdodds/kentcdodds.com/edit/main/${entry}`,
-        }
-      } else {
-        return null
-      }
-    },
-  })
-  // if there's no page, remove it from the cache
-  if (!page) {
-    void redisCache.del(key)
-  }
-  return page
-}
+} from '~/images.tsx'
+import {type RootLoaderType} from '~/root.tsx'
+import {type MdxPage} from '~/types.ts'
+import {
+  AnchorOrLink,
+  getDisplayUrl,
+  getUrl,
+  typedBoolean,
+} from '~/utils/misc.tsx'
+import {getSocialMetas} from './seo.ts'
+import {Themed} from './theme.tsx'
+import {useOptionalUser} from './use-root-data.ts'
 
 function getBannerAltProp(frontmatter: MdxPage['frontmatter']) {
   return (
@@ -256,74 +37,42 @@ function getBannerTitleProp(frontmatter: MdxPage['frontmatter']) {
   )
 }
 
-async function getBlurDataUrl(cloudinaryId: string) {
-  const imageURL = buildImageUrl(cloudinaryId, {
-    transformations: {
-      resize: {width: 100},
-      quality: 'auto',
-      format: 'webp',
-      effect: {
-        name: 'blur',
-        value: '1000',
-      },
-    },
-  })
-  const dataUrl = await getDataUrlForImage(imageURL)
-  return dataUrl
-}
+type ExtraMeta = Array<{[key: string]: string}>
 
-async function getDataUrlForImage(imageUrl: string) {
-  const res = await fetch(imageUrl)
-  const arrayBuffer = await res.arrayBuffer()
-  const base64 = Buffer.from(arrayBuffer).toString('base64')
-  const mime = res.headers.get('Content-Type') ?? 'image/webp'
-  const dataUrl = `data:${mime};base64,${base64}`
-  return dataUrl
-}
+type MetaLoader = () => Promise<
+  TypedResponse<{
+    page: MdxPage
+  }>
+>
 
-async function getBlogMdxListItems(options: CachifiedOptions) {
-  return cachified({
-    cache: redisCache,
-    maxAge: defaultMaxAge,
-    ...options,
-    key: 'blog:mdx-list-items',
-    getFreshValue: async () => {
-      let pages = await getMdxPagesInDirectory('blog', options)
-
-      pages = pages.sort((a, z) => {
-        const aTime = new Date(a.frontmatter.date ?? '').getTime()
-        const zTime = new Date(z.frontmatter.date ?? '').getTime()
-        return aTime > zTime ? -1 : aTime === zTime ? 0 : 1
-      })
-
-      return pages.map(mapFromMdxPageToMdxListItem)
-    },
-  })
-}
-
-function mdxPageMeta({
+const mdxPageMeta: MetaFunction<MetaLoader, {root: RootLoaderType}> = ({
   data,
-  parentsData,
-}: {
-  data: {page: MdxPage | null} | null
-  parentsData: {root: RootLoaderData}
-}) {
-  const {requestInfo} = parentsData.root
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
   if (data?.page) {
-    const {keywords = [], ...extraMeta} = data.page.frontmatter.meta ?? {}
+    // NOTE: keyword metadata is not used because it was used and abused by
+    // spammers. We use them for sorting on our own site, but we don't list
+    // it in the meta tags because it's possible to be penalized for doing so.
+    const {keywords, ...extraMetaInfo} = data.page.frontmatter.meta ?? {}
+    const extraMeta: ExtraMeta = Object.entries(extraMetaInfo).reduce(
+      (acc: ExtraMeta, [key, val]) => [...acc, {[key]: String(val)}],
+      [],
+    )
+
     let title = data.page.frontmatter.title
     const isDraft = data.page.frontmatter.draft
+    const isUnlisted = data.page.frontmatter.unlisted
     if (isDraft) title = `(DRAFT) ${title ?? ''}`
-    return {
-      ...(isDraft ? {robots: 'noindex'} : null),
+
+    return [
+      isDraft || isUnlisted ? {robots: 'noindex'} : null,
       ...getSocialMetas({
-        origin: requestInfo.origin,
         title,
         description: data.page.frontmatter.description,
-        keywords: keywords.join(', '),
         url: getUrl(requestInfo),
         image: getSocialImageWithPreTitle({
-          origin: requestInfo.origin,
           url: getDisplayUrl(requestInfo),
           featuredImage:
             data.page.frontmatter.bannerCloudinaryId ??
@@ -338,30 +87,58 @@ function mdxPageMeta({
         }),
       }),
       ...extraMeta,
-    }
+    ].filter(typedBoolean)
   } else {
-    return {
-      title: 'Not found',
-      description:
-        'You landed on a page that Kody the Coding Koala could not find 🐨😢',
-    }
+    return [
+      {title: 'Not found'},
+      {
+        description:
+          'You landed on a page that Kody the Coding Koala could not find 🐨😢',
+      },
+    ]
   }
 }
 
-/**
- * This is useful for when you don't want to send all the code for a page to the client.
- */
-function mapFromMdxPageToMdxListItem(page: MdxPage): MdxListItem {
-  const {code, ...mdxListItem} = page
-  return mdxListItem
+function OptionalUser({
+  children,
+}: {
+  children: (user: ReturnType<typeof useOptionalUser>) => React.ReactElement
+}) {
+  const user = useOptionalUser()
+  return children(user)
 }
 
 const mdxComponents = {
   a: AnchorOrLink,
   Themed,
+  CloudinaryVideo,
   ThemedBlogImage,
   BlogImage,
+  SubscribeForm,
+  OptionalUser,
 }
+
+declare global {
+  type MDXProvidedComponents = typeof mdxComponents
+}
+
+interface CalloutProps {
+  children: React.ReactNode
+  class?: string
+}
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'callout-danger': CalloutProps
+      'callout-info': CalloutProps
+      'callout-muted': CalloutProps
+      'callout-success': CalloutProps
+      'callout-warning': CalloutProps
+    }
+  }
+}
+
 /**
  * This should be rendered within a useMemo
  * @param code the code to get the component from
@@ -384,12 +161,15 @@ function getMdxComponent(code: string) {
 function BlogImage({
   cloudinaryId,
   imgProps,
+  transparentBackground,
 }: {
   cloudinaryId: string
   imgProps: JSX.IntrinsicElements['img']
+  transparentBackground?: boolean
 }) {
   return (
     <img
+      // @ts-expect-error classname is overridden by getImgProps
       className="w-full rounded-lg object-cover py-8"
       {...getImgProps(getImageBuilder(cloudinaryId, imgProps.alt), {
         widths: [350, 550, 700, 845, 1250, 1700, 2550],
@@ -398,7 +178,9 @@ function BlogImage({
           '(min-width:1024px) and (max-width:1620px) 50vw',
           '850px',
         ],
-        transformations: {background: 'rgb:e6e9ee'},
+        transformations: {
+          background: transparentBackground ? undefined : 'rgb:e6e9ee',
+        },
       })}
       {...imgProps}
     />
@@ -409,31 +191,77 @@ function ThemedBlogImage({
   darkCloudinaryId,
   lightCloudinaryId,
   imgProps,
+  transparentBackground,
 }: {
   darkCloudinaryId: string
   lightCloudinaryId: string
   imgProps: JSX.IntrinsicElements['img']
+  transparentBackground?: boolean
 }) {
   return (
     <Themed
-      light={<BlogImage cloudinaryId={lightCloudinaryId} imgProps={imgProps} />}
-      dark={<BlogImage cloudinaryId={darkCloudinaryId} imgProps={imgProps} />}
+      light={
+        <BlogImage
+          cloudinaryId={lightCloudinaryId}
+          imgProps={imgProps}
+          transparentBackground={transparentBackground}
+        />
+      }
+      dark={
+        <BlogImage
+          cloudinaryId={darkCloudinaryId}
+          imgProps={imgProps}
+          transparentBackground={transparentBackground}
+        />
+      }
     />
   )
 }
 
-function useMdxComponent(code: string) {
-  return React.useMemo(() => getMdxComponent(code), [code])
+function SubscribeForm(props: Record<string, unknown>) {
+  const {formId, convertKitTagId, convertKitFormId} = props
+
+  if (
+    typeof formId !== 'string' ||
+    typeof convertKitFormId !== 'string' ||
+    typeof convertKitTagId !== 'string'
+  ) {
+    console.error(
+      `SubscribeForm improperly used. Must have a formId, convertKitFormId, and convertKitTagId`,
+      props,
+    )
+    return null
+  }
+
+  return (
+    <div className="mb-12 border-b-2 border-t-2 border-team-current p-5">
+      <ConvertKitForm
+        formId={formId}
+        convertKitFormId={convertKitFormId}
+        convertKitTagId={convertKitTagId}
+      />
+    </div>
+  )
 }
 
-export {
-  getMdxPage,
-  getMdxDirList,
-  getMdxPagesInDirectory,
-  mapFromMdxPageToMdxListItem,
-  getBlogMdxListItems,
-  mdxPageMeta,
-  useMdxComponent,
-  getBannerTitleProp,
-  getBannerAltProp,
+// This exists so we don't have to call new Function for the given code
+// for every request for a given blog post/mdx file.
+const mdxComponentCache = new LRUCache<
+  string,
+  ReturnType<typeof getMdxComponent>
+>({
+  max: 1000,
+})
+
+function useMdxComponent(code: string) {
+  return React.useMemo(() => {
+    if (mdxComponentCache.has(code)) {
+      return mdxComponentCache.get(code)!
+    }
+    const component = getMdxComponent(code)
+    mdxComponentCache.set(code, component)
+    return component
+  }, [code])
 }
+
+export {getBannerAltProp, getBannerTitleProp, mdxPageMeta, useMdxComponent}

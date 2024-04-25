@@ -1,40 +1,47 @@
-import * as React from 'react'
 import {
-  HeadersFunction,
   json,
-  LoaderFunction,
-  MetaFunction,
-  useLoaderData,
-} from 'remix'
-import {shuffle} from 'lodash'
+  type HeadersFunction,
+  type LoaderFunction,
+  type MetaFunction,
+} from '@remix-run/node'
+import {useLoaderData} from '@remix-run/react'
+import {shuffle} from '~/utils/cjs/lodash.js'
+import * as React from 'react'
+import {Grid} from '~/components/grid.tsx'
+import {
+  BehanceIcon,
+  CodepenIcon,
+  DribbbleIcon,
+  GithubIcon,
+  GlobeIcon,
+  InstagramIcon,
+  LinkedInIcon,
+  TwitchIcon,
+  XIcon,
+} from '~/components/icons.tsx'
+import {HeaderSection} from '~/components/sections/header-section.tsx'
+import {
+  HeroSection,
+  getHeroImageProps,
+} from '~/components/sections/hero-section.tsx'
+import {Spacer} from '~/components/spacer.tsx'
+import {H2, H3, H6, Paragraph} from '~/components/typography.tsx'
 import {
   getImageBuilder,
-  images,
   getImgProps,
   getSocialImageWithPreTitle,
-} from '~/images'
-import {H2, H3, H6, Paragraph} from '~/components/typography'
-import {Grid} from '~/components/grid'
-import {HeaderSection} from '~/components/sections/header-section'
+  images,
+} from '~/images.tsx'
+import {type Await} from '~/types.ts'
+import {getPeople} from '~/utils/credits.server.ts'
 import {
-  getHeroImageProps,
-  HeroSection,
-} from '~/components/sections/hero-section'
-import {GithubIcon} from '~/components/icons/github-icon'
-import {TwitterIcon} from '~/components/icons/twitter-icon'
-import {Spacer} from '~/components/spacer'
-import {getPeople} from '~/utils/credits.server'
-import type {Await} from '~/types'
-import {getDisplayUrl, getUrl, reuseUsefulLoaderHeaders} from '~/utils/misc'
-import {GlobeIcon} from '~/components/icons/globe-icon'
-import {DribbbleIcon} from '~/components/icons/dribbble-icon'
-import {InstagramIcon} from '~/components/icons/instagram-icon'
-import {LinkedInIcon} from '~/components/icons/linkedin-icon'
-import {getSocialMetas} from '~/utils/seo'
-import type {LoaderData as RootLoaderData} from '../root'
-import {TwitchIcon} from '~/components/icons/twitch-icon'
-import {CodepenIcon} from '~/components/icons/codepen-icon'
-import BehanceIcon from '~/components/icons/behance-icon'
+  getDisplayUrl,
+  getOrigin,
+  getUrl,
+  reuseUsefulLoaderHeaders,
+} from '~/utils/misc.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {type RootLoaderType} from '~/root.tsx'
 
 export type LoaderData = {people: Await<ReturnType<typeof getPeople>>}
 
@@ -52,24 +59,23 @@ export const loader: LoaderFunction = async ({request}) => {
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  const domain = new URL(requestInfo.origin).host
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: `Who built ${domain}`,
-      description: `It took a team of people to create ${domain}. This page will tell you a little bit about them.`,
-      url: getUrl(requestInfo),
-      image: getSocialImageWithPreTitle({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: images.kentCodingOnCouch.id,
-        title: `The fantastic people who built ${domain}`,
-        preTitle: 'Check out these people',
-      }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  const domain = new URL(getOrigin(requestInfo)).host
+  return getSocialMetas({
+    title: `Who built ${domain}`,
+    description: `It took a team of people to create ${domain}. This page will tell you a little bit about them.`,
+    url: getUrl(requestInfo),
+    image: getSocialImageWithPreTitle({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: images.kentCodingOnCouch.id,
+      title: `The fantastic people who built ${domain}`,
+      preTitle: 'Check out these people',
     }),
-  }
+  })
 }
 
 type Person = LoaderData['people'][number]
@@ -81,7 +87,7 @@ type Socials = keyof Omit<
 const icons: Record<Socials, React.ReactElement> = {
   website: <GlobeIcon title="Website" />,
   github: <GithubIcon />,
-  twitter: <TwitterIcon />,
+  x: <XIcon />,
   instagram: <InstagramIcon />,
   dribbble: <DribbbleIcon />,
   codepen: <CodepenIcon />,
@@ -93,10 +99,10 @@ const icons: Record<Socials, React.ReactElement> = {
 function ProfileCard({person}: {person: Person}) {
   return (
     <div className="relative flex w-full flex-col">
-      <div className="aspect-w-3 aspect-h-4 mb-8 w-full flex-none">
+      <div className="aspect-[3/4] mb-8 w-full flex-none">
         <img
-          className="rounded-lg object-cover"
           {...getImgProps(getImageBuilder(person.cloudinaryId), {
+            className: 'rounded-lg object-cover',
             widths: [280, 560, 840, 1100, 1300, 1650],
             sizes: [
               '(max-width:639px) 80vw',
@@ -109,7 +115,7 @@ function ProfileCard({person}: {person: Person}) {
       </div>
 
       <div className="flex-auto">
-        <div className="mb-4 text-xl font-medium lowercase text-blueGray-500">
+        <div className="mb-4 text-xl font-medium lowercase text-slate-500">
           {person.role}
         </div>
         <H3 className="mb-6">{person.name}</H3>
@@ -143,13 +149,15 @@ function CreditsIndex() {
         subtitle="Start scrolling to learn more about everyone involved."
         image={
           <img
-            className="rounded-lg"
             {...getHeroImageProps(images.kentCodingOnCouch, {
-              resize: {
-                aspectRatio: '3:4',
-                type: 'crop',
+              className: 'rounded-lg',
+              transformations: {
+                resize: {
+                  aspectRatio: '3:4',
+                  type: 'crop',
+                },
+                gravity: 'face',
               },
-              gravity: 'face',
             })}
           />
         }

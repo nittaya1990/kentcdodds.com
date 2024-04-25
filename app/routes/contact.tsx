@@ -1,46 +1,26 @@
-import * as React from 'react'
-import type {ActionFunction, HeadersFunction, MetaFunction} from 'remix'
-import {useFetcher, json} from 'remix'
-import {useRootData} from '~/utils/use-root-data'
 import {
-  getHeroImageProps,
+  json,
+  type HeadersFunction,
+  type MetaFunction,
+  type DataFunctionArgs,
+} from '@remix-run/node'
+import {Link, useFetcher} from '@remix-run/react'
+import {Button} from '~/components/button.tsx'
+import {ButtonGroup, ErrorPanel, Field} from '~/components/form-elements.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {
   HeroSection,
-} from '~/components/sections/hero-section'
-import {getGenericSocialImage, images} from '~/images'
-import {H2, Paragraph} from '~/components/typography'
-import {ButtonGroup, ErrorPanel, Field} from '~/components/form-elements'
-import {Grid} from '~/components/grid'
-import {handleFormSubmission} from '~/utils/actions.server'
-import {sendEmail} from '~/utils/send-email.server'
-import {verifyEmailAddress} from '~/utils/verifier.server'
-import {Button} from '~/components/button'
-import type {LoaderData as RootLoaderData} from '../root'
-import {getSocialMetas} from '~/utils/seo'
-import {getDisplayUrl, getUrl} from '~/utils/misc'
-
-function getErrorForName(name: string | null) {
-  if (!name) return `Name is required`
-  if (name.length > 60) return `Name is too long`
-  return null
-}
-
-async function getErrorForEmail(email: string | null) {
-  if (!email) return `Email is required`
-  if (!/^.+@.+\..+$/.test(email)) return `That's not an email`
-
-  try {
-    const verifierResult = await verifyEmailAddress(email)
-    if (!verifierResult.status) {
-      return `I tried to verify that email address and got this error message: "${verifierResult.error.message}". If you think this is wrong, shoot an email to team@kentcdodds.com.`
-    }
-  } catch (error: unknown) {
-    console.error(`There was an error verifying an email address:`, error)
-    // continue on... This was probably our fault...
-    // IDEA: notify me of this issue...
-  }
-
-  return null
-}
+  getHeroImageProps,
+} from '~/components/sections/hero-section.tsx'
+import {H2, Paragraph} from '~/components/typography.tsx'
+import {getGenericSocialImage, images} from '~/images.tsx'
+import {handleFormSubmission} from '~/utils/actions.server.ts'
+import {getDisplayUrl, getUrl} from '~/utils/misc.tsx'
+import {sendEmail} from '~/utils/send-email.server.ts'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {requireUser} from '~/utils/session.server.ts'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {type RootLoaderType} from '~/root.tsx'
 
 function getErrorForSubject(subject: string | null) {
   if (!subject) return `Subject is required`
@@ -59,39 +39,38 @@ function getErrorForBody(body: string | null) {
 type ActionData = {
   status: 'success' | 'error'
   fields: {
-    name?: string | null
-    email?: string | null
     subject?: string | null
     body?: string | null
   }
   errors: {
     generalError?: string
-    name?: string | null
-    email?: string | null
     subject?: string | null
     body?: string | null
   }
 }
 
-export const action: ActionFunction = async ({request}) => {
+export const action = async ({request}: DataFunctionArgs) => {
+  const user = await requireUser(request)
   return handleFormSubmission<ActionData>({
     request,
     validators: {
-      name: getErrorForName,
-      email: getErrorForEmail,
       subject: getErrorForSubject,
       body: getErrorForBody,
     },
     handleFormValues: async fields => {
-      const {name, email, subject, body} = fields
+      const {subject, body} = fields
 
-      const sender = `"${name}" <${email}>`
+      const sender = `"${user.firstName}" <${user.email}>`
+
+      // this bit is included so I can have a filter that ensures
+      // messages sent from the contact form never end up in spam.
+      const noSpamMessage = '- Sent via the KCD Contact Form'
 
       await sendEmail({
         from: sender,
         to: `"Kent C. Dodds" <me@kentcdodds.com>`,
         subject,
-        text: body,
+        text: `${body}\n\n${noSpamMessage}`,
       })
 
       const actionData: ActionData = {fields, status: 'success', errors: {}}
@@ -105,31 +84,28 @@ export const headers: HeadersFunction = () => ({
   Vary: 'Cookie',
 })
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: 'Contact Kent C. Dodds',
-      description: 'Send Kent C. Dodds a personal email.',
-      url: getUrl(requestInfo),
-      image: getGenericSocialImage({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: 'unsplash/photo-1563225409-127c18758bd5',
-        words: `Shoot Kent an email`,
-      }),
+export const meta: MetaFunction<{}, {root: RootLoaderType}> = ({matches}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  return getSocialMetas({
+    title: 'Contact Kent C. Dodds',
+    description: 'Send Kent C. Dodds a personal email.',
+    url: getUrl(requestInfo),
+    image: getGenericSocialImage({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: 'unsplash/photo-1563225409-127c18758bd5',
+      words: `Shoot Kent an email`,
     }),
-  }
+  })
 }
 
 export default function ContactRoute() {
-  const contactFetcher = useFetcher()
+  const contactFetcher = useFetcher<typeof action>()
   const {user} = useRootData()
 
+  const isDone = contactFetcher.state === 'idle' && contactFetcher.data != null
   const emailSuccessfullySent =
-    contactFetcher.type === 'done' &&
-    (contactFetcher.data as ActionData).status === 'success'
+    isDone && (contactFetcher.data as ActionData).status === 'success'
 
   return (
     <div>
@@ -138,15 +114,17 @@ export default function ContactRoute() {
         subtitle="Like in the old days."
         image={
           <img
-            className="max-h-50vh rounded-br-[25%] rounded-tl-[25%] rounded-bl-3xl rounded-tr-3xl"
-            {...getHeroImageProps(images.kentProfile)}
+            {...getHeroImageProps(images.kentProfile, {
+              className:
+                'max-h-50vh rounded-bl-3xl rounded-br-[25%] rounded-tl-[25%] rounded-tr-3xl',
+            })}
           />
         }
       />
 
       <main>
         <contactFetcher.Form
-          method="post"
+          method="POST"
           noValidate
           aria-describedby="contact-form-error"
         >
@@ -172,67 +150,72 @@ export default function ContactRoute() {
             </div>
 
             <div className="col-span-full lg:col-span-8 lg:col-start-3">
-              <Field
-                name="name"
-                label="Name"
-                placeholder="Your name"
-                defaultValue={
-                  contactFetcher.data?.fields.name ?? user?.firstName ?? ''
-                }
-                error={contactFetcher.data?.errors.name}
-              />
-              <Field
-                type="email"
-                label="Email"
-                placeholder="person.doe@example.com"
-                defaultValue={
-                  contactFetcher.data?.fields.email ?? user?.email ?? ''
-                }
-                name="email"
-                error={contactFetcher.data?.errors.email}
-              />
-              <Field
-                name="subject"
-                label="Subject"
-                placeholder="No subject"
-                defaultValue={contactFetcher.data?.fields.subject ?? ''}
-                error={contactFetcher.data?.errors.subject}
-              />
-              <Field
-                name="body"
-                label="Body"
-                type="textarea"
-                placeholder="A clear and concise message works wonders."
-                rows={8}
-                defaultValue={contactFetcher.data?.fields.body ?? ''}
-                error={contactFetcher.data?.errors.body}
-              />
-              {emailSuccessfullySent ? (
+              {user ? (
                 <>
-                  {`Hooray, email sent! `}
-                  <span role="img" aria-label="party popper emoji">
-                    🎉
-                  </span>
+                  <Field
+                    name="name"
+                    label="Name"
+                    placeholder="Your name"
+                    disabled={true}
+                    defaultValue={user.firstName}
+                  />
+                  <Field
+                    type="email"
+                    label="Email"
+                    placeholder="person.doe@example.com"
+                    disabled={true}
+                    defaultValue={user.email}
+                    name="email"
+                  />
+                  <Field
+                    name="subject"
+                    label="Subject"
+                    placeholder="No subject"
+                    defaultValue={contactFetcher.data?.fields.subject ?? ''}
+                    error={contactFetcher.data?.errors.subject}
+                  />
+                  <Field
+                    name="body"
+                    label="Body"
+                    type="textarea"
+                    placeholder="A clear and concise message works wonders."
+                    rows={8}
+                    defaultValue={contactFetcher.data?.fields.body ?? ''}
+                    error={contactFetcher.data?.errors.body}
+                  />
+                  {emailSuccessfullySent ? (
+                    `Hooray, email sent! 🎉`
+                  ) : (
+                    // IDEA: show a loading state here
+                    <ButtonGroup>
+                      <Button
+                        type="submit"
+                        disabled={contactFetcher.state !== 'idle'}
+                      >
+                        Send message
+                      </Button>
+                      <Button variant="secondary" type="reset">
+                        Reset form
+                      </Button>
+                    </ButtonGroup>
+                  )}
+                  {contactFetcher.data?.errors.generalError ? (
+                    <ErrorPanel id="contact-form-error">
+                      {contactFetcher.data.errors.generalError}
+                    </ErrorPanel>
+                  ) : null}
                 </>
               ) : (
-                // IDEA: show a loading state here
-                <ButtonGroup>
-                  <Button
-                    type="submit"
-                    disabled={contactFetcher.state !== 'idle'}
-                  >
-                    Send message
-                  </Button>
-                  <Button variant="secondary" type="reset">
-                    Reset form
-                  </Button>
-                </ButtonGroup>
+                <div className="col-span-full mb-12 lg:col-span-8 lg:col-start-3">
+                  <Paragraph>
+                    Note: due to spam issues, you have to confirm your email by{' '}
+                    <Link to="/login" className="underline">
+                      signing up for an account
+                    </Link>{' '}
+                    on my website first.
+                  </Paragraph>
+                </div>
               )}
-              {contactFetcher.data?.errors.generalError ? (
-                <ErrorPanel id="contact-form-error">
-                  {contactFetcher.data.errors.generalError}
-                </ErrorPanel>
-              ) : null}
             </div>
           </Grid>
         </contactFetcher.Form>

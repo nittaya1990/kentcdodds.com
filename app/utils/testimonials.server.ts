@@ -1,9 +1,11 @@
+import slugify from '@sindresorhus/slugify'
 import * as YAML from 'yaml'
-import {pick} from 'lodash'
-import {downloadFile} from './github.server'
-import {getErrorMessage, typedBoolean} from './misc'
-import {redisCache} from './redis.server'
-import {cachified} from './cache.server'
+import {pick} from '~/utils/cjs/lodash.js'
+import {cache, cachified} from './cache.server.ts'
+import {downloadFile} from './github.server.ts'
+import {markdownToHtml} from './markdown.server.ts'
+import {getErrorMessage, typedBoolean} from './misc.tsx'
+import {type Timings} from './timing.server.ts'
 
 const allCategories = [
   'teaching',
@@ -12,13 +14,28 @@ const allCategories = [
   'courses',
   'workshop',
   'community',
+  'podcast',
+  'youtube',
+  'talk',
+  'blog',
+  'remix',
 ] as const
-export type TestimonialCategory = typeof allCategories[number]
+export type TestimonialCategory = (typeof allCategories)[number]
 
 const allSubjects = [
+  'EpicWeb.dev',
   'EpicReact.dev',
   'TestingJavaScript.com',
   'Discord Community',
+  'Workshop',
+  'Call Kent Podcast',
+  'Chats with Kent Podcast',
+  'YouTube Live Streams',
+  'KCD Office Hours',
+  'Talk',
+  'Blog',
+  'Frontend Masters',
+  'Egghead.io',
   'workshop: react-fundamentals',
   'workshop: react-hooks',
   'workshop: advanced-react-hooks',
@@ -29,20 +46,24 @@ const allSubjects = [
   'workshop: build-an-epic-react-app',
   'workshop: testing-fundamentals',
   'workshop: testing-node-apps',
+  'workshop: web-app-fundamentals-part-1',
+  'workshop: web-app-fundamentals-part-2',
   'Other',
 ] as const
-export type TestimonialSubject = typeof allSubjects[number]
+export type TestimonialSubject = (typeof allSubjects)[number]
 
 export type Testimonial = {
+  id: string
   author: string
   cloudinaryId: string
   company: string
   testimonial: string
+  link: string | null
 }
 
 export type TestimonialWithMetadata = Testimonial & {
   priority: 0 | 1 | 2 | 3 | 4 | 5
-  subject: TestimonialSubject
+  subjects: Array<TestimonialSubject>
   categories: Array<TestimonialCategory>
 }
 
@@ -50,9 +71,19 @@ const categoriesBySubject: Record<
   TestimonialSubject,
   Array<TestimonialCategory>
 > = {
+  'EpicWeb.dev': ['teaching', 'courses', 'testing', 'workshop'],
   'Discord Community': ['community'],
   'EpicReact.dev': ['teaching', 'courses', 'react'],
   'TestingJavaScript.com': ['teaching', 'courses', 'testing'],
+  Workshop: ['workshop'],
+  'Call Kent Podcast': ['podcast'],
+  'Chats with Kent Podcast': ['podcast'],
+  'YouTube Live Streams': ['youtube'],
+  'KCD Office Hours': ['youtube'],
+  Talk: ['talk'],
+  Blog: ['blog'],
+  'Frontend Masters': ['courses'],
+  'Egghead.io': ['courses'],
   'workshop: react-fundamentals': ['workshop', 'react'],
   'workshop: react-hooks': ['workshop', 'react'],
   'workshop: advanced-react-hooks': ['workshop', 'react'],
@@ -63,6 +94,8 @@ const categoriesBySubject: Record<
   'workshop: build-an-epic-react-app': ['workshop', 'react', 'testing'],
   'workshop: testing-fundamentals': ['workshop', 'react', 'testing'],
   'workshop: testing-node-apps': ['workshop', 'react', 'testing'],
+  'workshop: web-app-fundamentals-part-1': ['workshop', 'remix'],
+  'workshop: web-app-fundamentals-part-2': ['workshop', 'remix'],
   Other: [],
 }
 
@@ -77,13 +110,14 @@ function getValueWithFallback<PropertyType>(
   }: {
     fallback?: PropertyType
     warnOnFallback?: boolean
-    validateType: (v: unknown) => boolean
+    validateType(v: unknown): v is PropertyType
   },
 ) {
   const value = obj[key]
   if (validateType(value)) {
-    return value as PropertyType
-  } else if (fallback) {
+    return value
+    // eslint-disable-next-line no-negated-condition
+  } else if (typeof fallback !== 'undefined') {
     if (warnOnFallback) console.warn(`Had to use fallback`, {obj, key, value})
     return fallback
   } else {
@@ -93,35 +127,53 @@ function getValueWithFallback<PropertyType>(
   }
 }
 
-const isString = (v: unknown) => typeof v === 'string'
-const isOneOf = (validValues: ReadonlyArray<unknown>) => (v: unknown) =>
-  validValues.includes(v)
+const isString = (v: any): v is string => typeof v === 'string'
+const isOneOf =
+  <ValidValue>(validValues: ReadonlyArray<ValidValue>) =>
+  (v: any): v is ValidValue =>
+    validValues.includes(v)
+const areOneOf =
+  <ValidValue>(validValues: ReadonlyArray<ValidValue>) =>
+  (v: any): v is Array<ValidValue> =>
+    Array.isArray(v) && v.every(isOneOf(validValues))
 
-function mapTestimonial(rawTestimonial: UnknownObj) {
+async function mapTestimonial(rawTestimonial: UnknownObj) {
   try {
-    const subject: TestimonialSubject = getValueWithFallback(
+    const link: string | null = getValueWithFallback(rawTestimonial, 'link', {
+      warnOnFallback: false,
+      fallback: null,
+      validateType: isString,
+    })
+    const subjects: Array<TestimonialSubject> = getValueWithFallback(
       rawTestimonial,
-      'subject',
-      {
-        fallback: 'Other',
-        validateType: isOneOf(allSubjects),
-      },
+      'subjects',
+      {fallback: ['Other'], validateType: areOneOf(allSubjects)},
     )
     const categories: Array<TestimonialCategory> = getValueWithFallback(
       rawTestimonial,
       'categories',
       {
         warnOnFallback: false,
-        fallback: categoriesBySubject[subject],
-        validateType: isOneOf(allCategories),
+        fallback: Array.from(
+          new Set(subjects.flatMap(s => categoriesBySubject[s])),
+        ),
+        validateType: areOneOf(allCategories),
       },
     )
+    const rawTestimonialContent = getValueWithFallback<string>(
+      rawTestimonial,
+      'testimonial',
+      {validateType: isString},
+    )
+    const author = getValueWithFallback(rawTestimonial, 'author', {
+      validateType: isString,
+    })
     const testimonial: TestimonialWithMetadata = {
-      author: getValueWithFallback(rawTestimonial, 'author', {
-        validateType: isString,
-      }),
-      subject,
+      id: slugify(author),
+      author,
+      subjects,
       categories,
+      link,
       priority: getValueWithFallback(rawTestimonial, 'priority', {
         fallback: 0,
         validateType: isOneOf([0, 1, 2, 3, 4, 5]),
@@ -132,9 +184,7 @@ function mapTestimonial(rawTestimonial: UnknownObj) {
       company: getValueWithFallback(rawTestimonial, 'company', {
         validateType: isString,
       }),
-      testimonial: getValueWithFallback(rawTestimonial, 'testimonial', {
-        validateType: isString,
-      }),
+      testimonial: await markdownToHtml(rawTestimonialContent),
     }
     return testimonial
   } catch (error: unknown) {
@@ -146,16 +196,21 @@ function mapTestimonial(rawTestimonial: UnknownObj) {
 async function getAllTestimonials({
   request,
   forceFresh,
+  timings,
 }: {
   request?: Request
   forceFresh?: boolean
+  timings?: Timings
 }) {
+  const key = 'content:data:testimonials.yml'
   const allTestimonials = await cachified({
-    cache: redisCache,
-    key: 'content:data:testimonials.yml',
+    cache,
     request,
+    timings,
+    key,
     forceFresh,
-    maxAge: 1000 * 60 * 60 * 24,
+    ttl: 1000 * 60 * 60 * 24,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
     getFreshValue: async (): Promise<Array<TestimonialWithMetadata>> => {
       const talksString = await downloadFile('content/data/testimonials.yml')
       const rawTestimonials = YAML.parse(talksString)
@@ -164,7 +219,9 @@ async function getAllTestimonials({
         throw new Error('Testimonials is not an array.')
       }
 
-      return rawTestimonials.map(mapTestimonial).filter(typedBoolean)
+      return (await Promise.all(rawTestimonials.map(mapTestimonial))).filter(
+        typedBoolean,
+      )
     },
     checkValue: (value: unknown) => Array.isArray(value),
   })
@@ -182,10 +239,12 @@ function mapOutMetadata(
   testimonialWithMetadata: TestimonialWithMetadata,
 ): Testimonial {
   return pick(testimonialWithMetadata, [
+    'id',
     'author',
     'cloudinaryId',
     'company',
     'testimonial',
+    'link',
   ])
 }
 
@@ -195,14 +254,20 @@ async function getTestimonials({
   subjects = [],
   categories = [],
   limit,
+  timings,
 }: {
   request?: Request
   forceFresh?: boolean
   subjects?: Array<TestimonialSubject>
   categories?: Array<TestimonialCategory>
   limit?: number
+  timings?: Timings
 }) {
-  const allTestimonials = await getAllTestimonials({request, forceFresh})
+  const allTestimonials = await getAllTestimonials({
+    request,
+    forceFresh,
+    timings,
+  })
 
   if (!(subjects.length + categories.length)) {
     // they must just want all the testimonials
@@ -210,7 +275,7 @@ async function getTestimonials({
   }
 
   const subjectTestimonials = allTestimonials
-    .filter(testimonial => subjects.includes(testimonial.subject))
+    .filter(testimonial => testimonial.subjects.some(s => subjects.includes(s)))
     .sort(sortByWithPriorityWeight)
 
   const fillerTestimonials = allTestimonials

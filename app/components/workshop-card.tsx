@@ -1,9 +1,8 @@
-import * as React from 'react'
-import {Link} from 'remix'
-import type {Workshop} from '~/types'
-import type {WorkshopEvent} from '~/utils/workshop-tickets.server'
-import {Spacer} from './spacer'
-import {H3, H6, Paragraph} from './typography'
+import {Link} from '@remix-run/react'
+import {type Workshop} from '~/types.ts'
+import {type WorkshopEvent} from '~/utils/workshop-tickets.server.ts'
+import {Spacer} from './spacer.tsx'
+import {H3, H6, Paragraph} from './typography.tsx'
 
 function truncate(text: string, length: number) {
   if (!text || text.length <= length) {

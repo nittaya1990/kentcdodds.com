@@ -16,6 +16,7 @@
 /ads.txt                                                                https://www.youtube.com/watch?v=dQw4w9WgXcQ
 /boaform(.*)                                                            https://www.youtube.com/watch?v=dQw4w9WgXcQ
 /setup.cgi                                                              https://www.youtube.com/watch?v=dQw4w9WgXcQ
+/cgi-bin(.*)                                                            https://www.youtube.com/watch?v=dQw4w9WgXcQ
 /s3cmd.ini                                                              https://www.youtube.com/watch?v=dQw4w9WgXcQ
 /HNAP1(.*)                                                              https://www.youtube.com/watch?v=dQw4w9WgXcQ
 # this is for phpmyadmin and php-my-admin stuff:
@@ -81,6 +82,7 @@ POST,DELETE,PATCH,PUT  /                                                https://
 /chats-with-kent-podcast/seasons/:seasonNumber/:path*       /chats/:seasonNumber
 
 /workshops/past                                            /workshops
+/workshops/remix-fundamentals                              /workshops/web-app-fundamentals
 
 # some people go to this page for some reason:
 /post/:slug*                                                             /blog/:slug*
@@ -115,6 +117,7 @@ POST,DELETE,PATCH,PUT  /                                                https://
 /workshops/hooks                                                        /workshops/react-hooks
 /workshops/build-react-apps                                             /workshops/build-react-apps-1
 /workshops/build-react-apps-advanced                                    /workshops/build-react-apps-3
+/workshops/web-app-fundamentals                                         /workshops/web-app-fundamentals-part-1
 /blog/make-test-utils-for-your-app                                      /blog/test-utils
 /blog/what-code-comments-can-teach-us-about-scaling-a-codebase          /blog/colocation
 /blog/avoid-nesting-in-tests                                            /blog/avoid-nesting-when-youre-testing
@@ -125,6 +128,20 @@ POST,DELETE,PATCH,PUT  /                                                https://
 /learning-clubs                                                         /clubs
 /blog/how-to-write-a-react-component-in-type-script                     /blog/how-to-write-a-react-component-in-typescript
 /blog/how-to-write-a-type-narrowing-identity-function-in-typescript     /blog/how-to-write-a-constrained-identity-function-in-typescript
+
+/talks/the-web-s-next-transformation                                    /talks/the-web-s-next-transition
+/talks/fullstack-components                                             /talks/full-stack-components
+
+# Old workshops
+/workshops/advanced-react-hooks                                         https://epicreact.dev/advanced-hooks
+# /workshops/advanced-react-patterns                                      https://epicreact.dev/patterns
+/workshops/cypress-fundamentals                                         https://testingjavascript.com/playlists/install-configure-and-script-cypress-for-javascript-web-applications-fca9
+/workshops/react-fundamentals                                           https://epicreact.dev/fundamentals
+/workshops/react-hooks                                                  https://epicreact.dev/hooks
+/workshops/react-performance                                            https://epicreact.dev/performance
+/workshops/testing-fundamentals                                         https://testingjavascript.com/playlists/fundamentals-of-testing-in-javascript-2c8a
+/workshops/testing-node-apps                                            https://testingjavascript.com/playlists/test-node-js-backends-1f90
+/workshops/testing-react-apps                                           https://epicreact.dev/testing
 
 # Joel whoopsies
 /chats-with-kent-podcast/seasons/01/episodes/01                         /chats-with-kent-podcast/seasons/01/episodes/growing-your-skills-and-career-through-teaching-with-ali-spittel

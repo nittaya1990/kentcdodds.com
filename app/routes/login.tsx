@@ -1,29 +1,35 @@
+import {
+  json,
+  redirect,
+  type ActionFunction,
+  type HeadersFunction,
+  type LoaderFunction,
+  type MetaFunction,
+} from '@remix-run/node'
+import {Form, useLoaderData} from '@remix-run/react'
 import * as React from 'react'
-import type {
-  ActionFunction,
-  HeadersFunction,
-  LoaderFunction,
-  MetaFunction,
-} from 'remix'
-import {Form, useLoaderData, json, redirect} from 'remix'
+import invariant from 'tiny-invariant'
+import {Button, LinkButton} from '~/components/button.tsx'
+import {Input, InputError, Label} from '~/components/form-elements.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {Paragraph} from '~/components/typography.tsx'
+import {getConvertKitSubscriber} from '~/convertkit/convertkit.server.ts'
+import {getGenericSocialImage, images} from '~/images.tsx'
+import {getLoginInfoSession} from '~/utils/login.server.ts'
 import {
   getDisplayUrl,
   getDomainUrl,
   getErrorMessage,
+  getOrigin,
   getUrl,
   reuseUsefulLoaderHeaders,
-} from '~/utils/misc'
-import {sendToken, getUser} from '~/utils/session.server'
-import {getLoginInfoSession} from '~/utils/login.server'
-import {getGenericSocialImage, images} from '~/images'
-import {Paragraph} from '~/components/typography'
-import {Button, LinkButton} from '~/components/button'
-import {Input, InputError, Label} from '~/components/form-elements'
-import {HeroSection} from '~/components/sections/hero-section'
-import {verifyEmailAddress} from '~/utils/verifier.server'
-import type {LoaderData as RootLoaderData} from '../root'
-import {getSocialMetas} from '~/utils/seo'
-import {Grid} from '~/components/grid'
+} from '~/utils/misc.tsx'
+import {prisma} from '~/utils/prisma.server.ts'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {getUser, sendToken} from '~/utils/session.server.ts'
+import {verifyEmailAddress} from '~/utils/verifier.server.ts'
+import {type RootLoaderType} from '~/root.tsx'
 
 type LoaderData = {
   email?: string
@@ -52,33 +58,33 @@ export const loader: LoaderFunction = async ({request}) => {
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  const domain = new URL(requestInfo.origin).host
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: `Login to ${domain}`,
-      description: `Sign up or login to ${domain} to join a team and learn together.`,
-      url: getUrl(requestInfo),
-      image: getGenericSocialImage({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: images.skis.id,
-        words: `Login to your account on ${domain}`,
-      }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  const domain = new URL(getOrigin(requestInfo)).host
+  return getSocialMetas({
+    title: `Login to ${domain}`,
+    description: `Sign up or login to ${domain} to join a team and learn together.`,
+    url: getUrl(requestInfo),
+    image: getGenericSocialImage({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: images.skis.id,
+      words: `Login to your account on ${domain}`,
     }),
-  }
+  })
 }
 
 export const action: ActionFunction = async ({request}) => {
-  const params = new URLSearchParams(await request.text())
+  const formData = await request.formData()
   const loginSession = await getLoginInfoSession(request)
 
-  const emailAddress = params.get('email')
+  const emailAddress = formData.get('email')
+  invariant(typeof emailAddress === 'string', 'Form submitted incorrectly')
   if (emailAddress) loginSession.setEmail(emailAddress)
 
-  if (!emailAddress?.match(/.+@.+/)) {
+  if (!emailAddress.match(/.+@.+/)) {
     loginSession.flashError('A valid email is required')
     return redirect(`/login`, {
       status: 400,
@@ -86,10 +92,22 @@ export const action: ActionFunction = async ({request}) => {
     })
   }
 
+  // this is our honeypot. Our login is passwordless.
+  const failedHoneypot = Boolean(formData.get('password'))
+  if (failedHoneypot) {
+    console.info(
+      `FAILED HONEYPOT ON LOGIN`,
+      Object.fromEntries(formData.entries()),
+    )
+    return redirect(`/login`, {
+      headers: await loginSession.getHeaders(),
+    })
+  }
+
   try {
-    const verifierResult = await verifyEmailAddress(emailAddress)
-    if (!verifierResult.status) {
-      const errorMessage = `I tried to verify that email and got this error message: "${verifierResult.error.message}". If you think this is wrong, shoot an email to team@kentcdodds.com.`
+    const verifiedStatus = await isEmailVerified(emailAddress)
+    if (!verifiedStatus.verified) {
+      const errorMessage = `I tried to verify that email and got this error message: "${verifiedStatus.message}". If you think this is wrong, sign up for Kent's mailing list first (using the form on the bottom of the page) and once that's confirmed you'll be able to sign up.`
       loginSession.flashError(errorMessage)
       return redirect(`/login`, {
         status: 400,
@@ -116,6 +134,24 @@ export const action: ActionFunction = async ({request}) => {
       headers: await loginSession.getHeaders(),
     })
   }
+}
+
+async function isEmailVerified(
+  email: string,
+): Promise<{verified: true} | {verified: false; message: string}> {
+  const verifierResult = await verifyEmailAddress(email)
+  if (verifierResult.status) return {verified: true}
+  const userExists = Boolean(
+    await prisma.user.findUnique({
+      select: {id: true},
+      where: {email},
+    }),
+  )
+  if (userExists) return {verified: true}
+  const convertKitSubscriber = await getConvertKitSubscriber(email)
+  if (convertKitSubscriber) return {verified: true}
+
+  return {verified: false, message: verifierResult.error.message}
 }
 
 function Login() {
@@ -145,7 +181,7 @@ function Login() {
               }}
               onSubmit={() => setSubmitted(true)}
               action="/login"
-              method="post"
+              method="POST"
               className="mb-10 lg:mb-12"
             >
               <div className="mb-6">
@@ -166,6 +202,18 @@ function Login() {
                   defaultValue={formValues.email}
                   required
                   placeholder="Email address"
+                />
+              </div>
+
+              <div style={{position: 'absolute', left: '-9999px'}}>
+                <label htmlFor="password-field">Password</label>
+                {/* eslint-disable-next-line jsx-a11y/autocomplete-valid */}
+                <input
+                  type="password"
+                  id="password-field"
+                  name="password"
+                  tabIndex={-1}
+                  autoComplete="nope"
                 />
               </div>
 
@@ -197,12 +245,9 @@ function Login() {
                 ) : data.email ? (
                   <p
                     id="success-message"
-                    className="text-lg text-gray-500 dark:text-blueGray-500"
+                    className="text-lg text-gray-500 dark:text-slate-500"
                   >
-                    <span role="img" aria-label="sparkles">
-                      ✨
-                    </span>
-                    {` A magic link has been sent to ${data.email}.`}
+                    {`✨ A magic link has been sent to ${data.email}.`}
                   </p>
                 ) : null}
               </div>
@@ -232,7 +277,7 @@ function Login() {
           >
             TestingJavaScript.com
           </a>
-          {` and `}
+          {`, `}
           <a
             href="https://epicreact.dev"
             className="underlined text-blue-500"
@@ -240,6 +285,15 @@ function Login() {
             rel="noreferrer noopener"
           >
             EpicReact.dev
+          </a>
+          {`, and `}
+          <a
+            href="https://epicweb.dev"
+            className="underlined text-red-500"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            EpicWeb.dev
           </a>
           {`
             accounts, but I recommend you use the same email address for all of

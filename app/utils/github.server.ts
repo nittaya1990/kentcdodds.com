@@ -1,30 +1,31 @@
-import nodePath from 'path'
-import {Octokit as createOctokit} from '@octokit/rest'
 import {throttling} from '@octokit/plugin-throttling'
-import type {GitHubFile} from '~/types'
+import {Octokit as createOctokit} from '@octokit/rest'
+import nodePath from 'path'
+import {type GitHubFile} from '~/types.ts'
+
+const ref = process.env.GITHUB_REF ?? 'main'
+
+const safePath = (s: string) => s.replace(/\\/g, '/')
 
 const Octokit = createOctokit.plugin(throttling)
 
-type ThrottleOptions = {
-  method: string
-  url: string
-  request: {retryCount: number}
-}
 const octokit = new Octokit({
   auth: process.env.BOT_GITHUB_TOKEN,
   throttle: {
-    onRateLimit: (retryAfter: number, options: ThrottleOptions) => {
+    onRateLimit: (retryAfter, options) => {
+      const method = 'method' in options ? options.method : 'METHOD_UNKNOWN'
+      const url = 'url' in options ? options.url : 'URL_UNKNOWN'
       console.warn(
-        `Request quota exhausted for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds.`,
+        `Request quota exhausted for request ${method} ${url}. Retrying after ${retryAfter} seconds.`,
       )
 
       return true
     },
-    onAbuseLimit: (retryAfter: number, options: ThrottleOptions) => {
+    onSecondaryRateLimit: (retryAfter, options) => {
+      const method = 'method' in options ? options.method : 'METHOD_UNKNOWN'
+      const url = 'url' in options ? options.url : 'URL_UNKNOWN'
       // does not retry, only logs a warning
-      octokit.log.warn(
-        `Abuse detected for request ${options.method} ${options.url}`,
-      )
+      octokit.log.warn(`Abuse detected for request ${method} ${url}`)
     },
   },
 })
@@ -77,7 +78,9 @@ async function downloadMdxFileOrDirectory(
     // /content/about.mdx => entry is about.mdx, but compileMdx needs
     // the entry to be called "/content/index.mdx" so we'll set it to that
     // because this is the entry for this path
-    files = [{path: nodePath.join(mdxFileOrDirectory, 'index.mdx'), content}]
+    files = [
+      {path: safePath(nodePath.join(mdxFileOrDirectory, 'index.mdx')), content},
+    ]
   } else if (dirPotential) {
     entry = dirPotential.path
     files = await downloadDirectory(mdxFileOrDirectory)
@@ -100,7 +103,7 @@ async function downloadDirectory(dir: string): Promise<Array<GitHubFile>> {
       switch (type) {
         case 'file': {
           const content = await downloadFileBySha(sha)
-          return {path: fileDir, content}
+          return {path: safePath(fileDir), content}
         }
         case 'dir': {
           return downloadDirectory(fileDir)
@@ -121,39 +124,36 @@ async function downloadDirectory(dir: string): Promise<Array<GitHubFile>> {
  * @returns a promise that resolves to a string of the contents of the file
  */
 async function downloadFileBySha(sha: string) {
-  const {data} = await octokit.request(
-    'GET /repos/{owner}/{repo}/git/blobs/{file_sha}',
-    {
-      owner: 'kentcdodds',
-      repo: 'kentcdodds.com',
-      file_sha: sha,
-    },
-  )
+  const {data} = await octokit.git.getBlob({
+    owner: 'kentcdodds',
+    repo: 'kentcdodds.com',
+    file_sha: sha,
+  })
   //                                lol
   const encoding = data.encoding as Parameters<typeof Buffer.from>['1']
   return Buffer.from(data.content, encoding).toString()
 }
 
+// IDEA: possibly change this to a regular fetch since all my content is public anyway:
+// https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}
+// nice thing is it's not rate limited
 async function downloadFile(path: string) {
-  const {data} = (await octokit.request(
-    'GET /repos/{owner}/{repo}/contents/{path}',
-    {
-      owner: 'kentcdodds',
-      repo: 'kentcdodds.com',
-      path,
-    },
-  )) as {data: {content?: string; encoding?: string}}
+  const {data} = await octokit.repos.getContent({
+    owner: 'kentcdodds',
+    repo: 'kentcdodds.com',
+    path,
+    ref,
+  })
 
-  if (!data.content || !data.encoding) {
-    console.error(data)
-    throw new Error(
-      `Tried to get ${path} but got back something that was unexpected. It doesn't have a content or encoding property`,
-    )
+  if ('content' in data && 'encoding' in data) {
+    const encoding = data.encoding as Parameters<typeof Buffer.from>['1']
+    return Buffer.from(data.content, encoding).toString()
   }
 
-  //                                lol
-  const encoding = data.encoding as Parameters<typeof Buffer.from>['1']
-  return Buffer.from(data.content, encoding).toString()
+  console.error(data)
+  throw new Error(
+    `Tried to get ${path} but got back something that was unexpected. It doesn't have a content or encoding property`,
+  )
 }
 
 /**
@@ -166,6 +166,7 @@ async function downloadDirList(path: string) {
     owner: 'kentcdodds',
     repo: 'kentcdodds.com',
     path,
+    ref,
   })
   const data = resp.data
 

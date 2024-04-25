@@ -1,237 +1,170 @@
-import LRU from 'lru-cache'
-import {formatDuration, intervalToDuration} from 'date-fns'
-import type {Timings} from './metrics.server'
-import {time} from './metrics.server'
-import {getUser} from './session.server'
+import {remember} from '@epic-web/remember'
+import type BetterSqlite3 from 'better-sqlite3'
+import Database from 'better-sqlite3'
+import {
+  type Cache,
+  cachified as baseCachified,
+  verboseReporter,
+  type CacheEntry,
+  type Cache as CachifiedCache,
+  type CachifiedOptions,
+  totalTtl,
+} from '@epic-web/cachified'
+import fs from 'fs'
+import {getInstanceInfo, getInstanceInfoSync} from 'litefs-js'
+import {LRUCache} from 'lru-cache'
+import {updatePrimaryCacheValue} from '~/routes/resources+/cache.sqlite.ts'
+import {getRequiredServerEnvVar} from './misc.tsx'
+import {getUser} from './session.server.ts'
+import {time, type Timings} from './timing.server.ts'
 
-function niceFormatDuration(milliseconds: number) {
-  const duration = intervalToDuration({start: 0, end: milliseconds})
-  const formatted = formatDuration(duration, {delimiter: ', '})
-  const ms = milliseconds % 1000
-  return [formatted, ms ? `${ms.toFixed(3)}ms` : null]
-    .filter(Boolean)
-    .join(', ')
-}
+const CACHE_DATABASE_PATH = getRequiredServerEnvVar('CACHE_DATABASE_PATH')
 
-declare global {
-  // This preserves the LRU cache during development
-  // eslint-disable-next-line
-  var lruCache:
-    | (LRU<string, {metadata: CacheMetadata; value: any}> & {name: string})
-    | undefined
-}
+const cacheDb = remember('cacheDb', createDatabase)
 
-const lruCache = (global.lruCache = global.lruCache
-  ? global.lruCache
-  : createLruCache())
+function createDatabase(tryAgain = true): BetterSqlite3.Database {
+  const db = new Database(CACHE_DATABASE_PATH)
+  const {currentIsPrimary} = getInstanceInfoSync()
+  if (!currentIsPrimary) return db
 
-function createLruCache() {
-  // doing anything other than "any" here was a big pain
-  const newCache = new LRU<string, {metadata: CacheMetadata; value: any}>({
-    max: 1000,
-    maxAge: 1000 * 60 * 60, // 1 hour
-  })
-  Object.assign(newCache, {name: 'LRU'})
-  return newCache as typeof newCache & {name: 'LRU'}
-}
-
-type CacheMetadata = {
-  createdTime: number
-  maxAge: number | null
-}
-
-function shouldRefresh(metadata: CacheMetadata) {
-  if (metadata.maxAge) {
-    return Date.now() > metadata.createdTime + metadata.maxAge
+  try {
+    // create cache table with metadata JSON column and value JSON column if it does not exist already
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cache (
+        key TEXT PRIMARY KEY,
+        metadata TEXT,
+        value TEXT
+      )
+    `)
+  } catch (error: unknown) {
+    fs.unlinkSync(CACHE_DATABASE_PATH)
+    if (tryAgain) {
+      console.error(
+        `Error creating cache database, deleting the file at "${CACHE_DATABASE_PATH}" and trying again...`,
+      )
+      return createDatabase(false)
+    }
+    throw error
   }
-  return false
+  return db
 }
 
-type VNUP<Value> = Value | null | undefined | Promise<Value | null | undefined>
+const lruInstance = remember(
+  'lru-cache',
+  () => new LRUCache<string, CacheEntry<unknown>>({max: 5000}),
+)
 
-const keysRefreshing = new Set()
-
-async function cachified<
-  Value,
-  Cache extends {
-    name: string
-    get: (key: string) => VNUP<{
-      metadata: CacheMetadata
-      value: Value
-    }>
-    set: (
-      key: string,
-      value: {
-        metadata: CacheMetadata
-        value: Value
-      },
-    ) => unknown | Promise<unknown>
-    del: (key: string) => unknown | Promise<unknown>
+export const lruCache = {
+  set(key, value) {
+    const ttl = totalTtl(value.metadata)
+    return lruInstance.set(key, value, {
+      ttl: ttl === Infinity ? undefined : ttl,
+      start: value.metadata.createdTime,
+    })
   },
->(options: {
-  key: string
-  cache: Cache
-  getFreshValue: () => Promise<Value>
-  checkValue?: (value: Value) => boolean | string
+  get(key) {
+    return lruInstance.get(key)
+  },
+  delete(key) {
+    return lruInstance.delete(key)
+  },
+} satisfies Cache
+
+const preparedGet = cacheDb.prepare(
+  'SELECT value, metadata FROM cache WHERE key = ?',
+)
+const preparedSet = cacheDb.prepare(
+  'INSERT OR REPLACE INTO cache (key, value, metadata) VALUES (@key, @value, @metadata)',
+)
+const preparedDelete = cacheDb.prepare('DELETE FROM cache WHERE key = ?')
+
+export const cache: CachifiedCache = {
+  name: 'SQLite cache',
+  get(key) {
+    const result = preparedGet.get(key) as any // TODO: fix this with zod or something
+    if (!result) return null
+    return {
+      metadata: JSON.parse(result.metadata),
+      value: JSON.parse(result.value),
+    }
+  },
+  async set(key, entry) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const {currentIsPrimary, primaryInstance} = await getInstanceInfo()
+    if (currentIsPrimary) {
+      preparedSet.run({
+        key,
+        value: JSON.stringify(entry.value),
+        metadata: JSON.stringify(entry.metadata),
+      })
+    } else {
+      // fire-and-forget cache update
+      void updatePrimaryCacheValue!({
+        key,
+        cacheValue: entry,
+      }).then(response => {
+        if (!response.ok) {
+          console.error(
+            `Error updating cache value for key "${key}" on primary instance (${primaryInstance}): ${response.status} ${response.statusText}`,
+            {entry},
+          )
+        }
+      })
+    }
+  },
+  async delete(key) {
+    const {currentIsPrimary, primaryInstance} = await getInstanceInfo()
+    if (currentIsPrimary) {
+      preparedDelete.run(key)
+    } else {
+      // fire-and-forget cache update
+      void updatePrimaryCacheValue!({
+        key,
+        cacheValue: undefined,
+      }).then(response => {
+        if (!response.ok) {
+          console.error(
+            `Error deleting cache value for key "${key}" on primary instance (${primaryInstance}): ${response.status} ${response.statusText}`,
+          )
+        }
+      })
+    }
+  },
+}
+
+const preparedAllKeys = cacheDb.prepare('SELECT key FROM cache LIMIT ?')
+export async function getAllCacheKeys(limit: number) {
+  return {
+    sqlite: preparedAllKeys.all(limit).map(row => (row as {key: string}).key),
+    lru: [...lruInstance.keys()],
+  }
+}
+
+const preparedKeySearch = cacheDb.prepare(
+  'SELECT key FROM cache WHERE key LIKE ? LIMIT ?',
+)
+export async function searchCacheKeys(search: string, limit: number) {
+  return {
+    sqlite: preparedKeySearch
+      .all(`%${search}%`, limit)
+      .map(row => (row as {key: string}).key),
+    lru: [...lruInstance.keys()].filter(key => key.includes(search)),
+  }
+}
+
+export async function shouldForceFresh({
+  forceFresh,
+  request,
+  key,
+}: {
   forceFresh?: boolean | string
   request?: Request
-  fallbackToCache?: boolean
-  timings?: Timings
-  timingType?: string
-  maxAge?: number
-}): Promise<Value> {
-  const {
-    key,
-    cache,
-    getFreshValue,
-    request,
-    checkValue = value => Boolean(value),
-    fallbackToCache = true,
-    timings,
-    timingType = 'getting fresh value',
-    maxAge,
-  } = options
+  key: string
+}) {
+  if (typeof forceFresh === 'boolean') return forceFresh
+  if (typeof forceFresh === 'string') return forceFresh.split(',').includes(key)
 
-  // if forceFresh is a string, we'll only force fresh if the key is in the
-  // comma separated list. Otherwise we'll go with it's value and fallback
-  // to the shouldForceFresh function on the request if the request is provided
-  // otherwise it's false.
-  const forceFresh =
-    typeof options.forceFresh === 'string'
-      ? options.forceFresh.split(',').includes(key)
-      : options.forceFresh ??
-        (request ? await shouldForceFresh(request, key) : false)
-
-  function assertCacheEntry(entry: unknown): asserts entry is {
-    metadata: CacheMetadata
-    value: Value
-  } {
-    if (typeof entry !== 'object' || entry === null) {
-      throw new Error(
-        `Cache entry for ${key} is not a cache entry object, it's a ${typeof entry}`,
-      )
-    }
-    if (!('metadata' in entry)) {
-      throw new Error(
-        `Cache entry for ${key} does not have a metadata property`,
-      )
-    }
-    if (!('value' in entry)) {
-      throw new Error(`Cache entry for ${key} does not have a value property`)
-    }
-  }
-
-  if (!forceFresh) {
-    try {
-      const cached = await time({
-        name: `cache.get(${key})`,
-        type: 'cache read',
-        fn: () => cache.get(key),
-        timings,
-      })
-      if (cached) {
-        assertCacheEntry(cached)
-
-        if (shouldRefresh(cached.metadata)) {
-          // time to refresh the value. Fire and forget so we don't slow down
-          // this request
-          // we use setTimeout here to make sure this happens on the next tick
-          // of the event loop so we don't end up slowing this request down in the
-          // event the cache is synchronous (unlikely now, but if the code is changed
-          // then it's quite possible this could happen and it would be easy to
-          // forget to check).
-          // In practice we have had a handful of situations where multiple
-          // requests triggered a refresh of the same resource, so that's what
-          // the keysRefreshing thing is for to ensure we don't refresh a
-          // value if it's already in the process of being refreshed.
-          if (!keysRefreshing.has(key)) {
-            keysRefreshing.add(key)
-            setTimeout(() => {
-              // eslint-disable-next-line prefer-object-spread
-              void cachified(Object.assign({}, options, {forceFresh: true}))
-                .catch(() => {})
-                .finally(() => {
-                  keysRefreshing.delete(key)
-                })
-            }, 200)
-          }
-        }
-        const valueCheck = checkValue(cached.value)
-        if (valueCheck === true) {
-          return cached.value
-        } else {
-          const reason = typeof valueCheck === 'string' ? valueCheck : 'unknown'
-          console.warn(
-            `check failed for cached value of ${key}\nReason: ${reason}.\nDeleting the cache key and trying to get a fresh value.`,
-            cached,
-          )
-          await cache.del(key)
-        }
-      }
-    } catch (error: unknown) {
-      console.error(
-        `error with cache at ${key}. Deleting the cache key and trying to get a fresh value.`,
-        error,
-      )
-      await cache.del(key)
-    }
-  }
-
-  const start = performance.now()
-  const value = await time({
-    name: `getFreshValue for ${key}`,
-    type: timingType,
-    fn: getFreshValue,
-    timings,
-  }).catch((error: unknown) => {
-    console.error(
-      `getting a fresh value for ${key} failed`,
-      {fallbackToCache, forceFresh},
-      error,
-    )
-    // If we got this far without forceFresh then we know there's nothing
-    // in the cache so no need to bother trying again without a forceFresh.
-    // So we need both the option to fallback and the ability to fallback.
-    if (fallbackToCache && forceFresh) {
-      return cachified({...options, forceFresh: false})
-    } else {
-      throw error
-    }
-  })
-  const totalTime = performance.now() - start
-
-  const valueCheck = checkValue(value)
-  if (valueCheck === true) {
-    const metadata: CacheMetadata = {
-      maxAge: maxAge ?? null,
-      createdTime: Date.now(),
-    }
-    try {
-      console.log(
-        `Updating the cache value for ${key}.`,
-        `Getting a fresh value for this took ${niceFormatDuration(totalTime)}.`,
-        `Caching for a minimum of ${
-          typeof maxAge === 'number'
-            ? `${niceFormatDuration(maxAge)}`
-            : 'forever'
-        } in ${cache.name}.`,
-      )
-      await cache.set(key, {metadata, value})
-    } catch (error: unknown) {
-      console.error(`error setting cache: ${key}`, error)
-    }
-  } else {
-    const reason = typeof valueCheck === 'string' ? valueCheck : 'unknown'
-    console.error(
-      `check failed for cached value of ${key}\nReason: ${reason}.\nDeleting the cache key and trying to get a fresh value.`,
-      value,
-    )
-    throw new Error(`check failed for fresh value of ${key}`)
-  }
-  return value
-}
-
-async function shouldForceFresh(request: Request, key: string) {
+  if (!request) return false
   const fresh = new URL(request.url).searchParams.get('fresh')
   if (typeof fresh !== 'string') return false
   if ((await getUser(request))?.role !== 'ADMIN') return false
@@ -240,11 +173,45 @@ async function shouldForceFresh(request: Request, key: string) {
   return fresh.split(',').includes(key)
 }
 
-export {cachified, lruCache}
-
-/*
-eslint
-  max-depth: "off",
-  no-multi-assign: "off",
-  @typescript-eslint/no-explicit-any: "off",
-*/
+export async function cachified<Value>({
+  request,
+  timings,
+  ...options
+}: Omit<CachifiedOptions<Value>, 'forceFresh'> & {
+  request?: Request
+  timings?: Timings
+  forceFresh?: boolean | string
+}): Promise<Value> {
+  let cachifiedResolved = false
+  const cachifiedPromise = baseCachified(
+    {
+      ...options,
+      forceFresh: await shouldForceFresh({
+        forceFresh: options.forceFresh,
+        request,
+        key: options.key,
+      }),
+      getFreshValue: async context => {
+        // if we've already retrieved the cached value, then this may be called
+        // after the response has already been sent so there's no point in timing
+        // how long this is going to take
+        if (!cachifiedResolved && timings) {
+          return time(() => options.getFreshValue(context), {
+            timings,
+            type: `getFreshValue:${options.key}`,
+            desc: `request forced to wait for a fresh ${options.key} value`,
+          })
+        }
+        return options.getFreshValue(context)
+      },
+    },
+    verboseReporter(),
+  )
+  const result = await time(cachifiedPromise, {
+    timings,
+    type: `cache:${options.key}`,
+    desc: `${options.key} cache retrieval`,
+  })
+  cachifiedResolved = true
+  return result
+}

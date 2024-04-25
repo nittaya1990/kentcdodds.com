@@ -1,8 +1,6 @@
-const path = require('path')
-const fs = require('fs')
-// this is installed by remix...
-// eslint-disable-next-line import/no-extraneous-dependencies
-const fetch = require('node-fetch')
+import path from 'path'
+import fs from 'fs'
+import {fileURLToPath} from 'url'
 
 const commit = process.env.COMMIT_SHA
 
@@ -26,21 +24,18 @@ async function getCommit() {
   }
 }
 
-async function go() {
-  const buildInfo = {
-    buildTime: Date.now(),
-    commit: await getCommit(),
-  }
-
-  fs.writeFileSync(
-    path.join(__dirname, '../public/build/info.json'),
-    JSON.stringify(buildInfo, null, 2),
-  )
-  console.log('build info generated', buildInfo)
+const buildInfo = {
+  buildTime: Date.now(),
+  commit: await getCommit(),
 }
-go()
 
-/*
-eslint
-  consistent-return: "off",
-*/
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const destDir = path.join(__dirname, '../build/client/build')
+if (!fs.existsSync(destDir)) {
+  fs.mkdirSync(destDir, {recursive: true})
+}
+fs.writeFileSync(
+  path.join(destDir, 'info.json'),
+  JSON.stringify(buildInfo, null, 2),
+)
+console.log('build info generated', buildInfo)

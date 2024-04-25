@@ -1,6 +1,7 @@
-import type {User} from '~/types'
-import {markdownToHtmlDocument} from './markdown.server'
-import {teams} from './misc'
+import {getRandomFlyingKody} from '~/images.tsx'
+import {type User} from '~/types.ts'
+import {markdownToHtmlDocument} from './markdown.server.ts'
+import {getOptionalTeam} from './misc.tsx'
 
 let mailgunDomain = 'mg.example.com'
 if (process.env.MAILGUN_DOMAIN) {
@@ -42,7 +43,7 @@ async function sendEmail({to, from, subject, text, html}: MailgunMessage) {
   })
 
   await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
-    method: 'post',
+    method: 'POST',
     body,
     headers: {
       Authorization: `Basic ${auth}`,
@@ -65,10 +66,9 @@ async function sendMagicLinkEmail({
   const {hostname} = new URL(domainUrl)
   const userExists = Boolean(user)
 
-  const teamColor =
-    user?.team.toLowerCase() ??
-    teams[Math.floor(Math.random() * teams.length)]?.toLowerCase() ??
-    'white'
+  const randomSportyKody = getRandomFlyingKody(
+    user ? getOptionalTeam(user.team) : undefined,
+  )
 
   const text = `
 Here's your sign-in link for ${hostname}:
@@ -98,25 +98,19 @@ P.S. If you did not request this email, you can safely ignore it.
     <meta http-equiv="Content-Type" content="text/html charset=UTF-8" />
     <style type="text/css">
       @font-face {
-        font-family: 'Matter';
-        src: url('https://kcd-img.netlify.app/Matter-Medium.woff2') format('woff2'),
-          url('https://kcd-img.netlify.app/Matter-Medium.woff') format('woff');
         font-weight: 500;
         font-style: normal;
         font-display: swap;
       }
 
       @font-face {
-        font-family: 'Matter';
-        src: url('https://kcd-img.netlify.app/Matter-Regular.woff2') format('woff2'),
-          url('https://kcd-img.netlify.app/Matter-Regular.woff') format('woff');
         font-weight: normal;
         font-style: normal;
         font-display: swap;
       }
     </style>
   </head>
-  <body style="font-family:Matter, sans-serif;">
+  <body style="font-family:ui-sans-serif, sans-serif;">
     <div style="margin: 0 auto; max-width: 450px;">
 
       <h2 style="text-align: center">${
@@ -125,17 +119,26 @@ P.S. If you did not request this email, you can safely ignore it.
           : `Hey ${emailAddress}! Welcome to ${hostname}`
       }</h2>
 
-      <center><img src="https://res.cloudinary.com/kentcdodds-com/image/upload/w_800,q_auto,f_auto/kentcdodds.com/illustrations/kody-flying_${teamColor}" style="max-width: 80%"></center>
-      
-      <h3 style="text-align: center">Click the button below to login to ${hostname}</h3>
-
       <a href="${magicLink}" style="display: block; margin: 0 auto; width: 80%; padding: 1.5rem; background: #A6DEE4; border-radius: 7px; border-width: 0; font-size: 1.1rem; text-align: center; font-family: sans-serif; text-decoration: none; color: black">
         ${userExists ? 'Login' : 'Create Account'}
       </a>
 
+      <br />
+
+      <center><img src="https://res.cloudinary.com/kentcdodds-com/image/upload/w_800,q_auto,f_auto/${
+        randomSportyKody.id
+      }" style="max-width: 80%;${
+        randomSportyKody.style?.aspectRatio
+          ? `aspect-ratio: ${randomSportyKody.style.aspectRatio};`
+          : ''
+      }"></center>
+
+      <h3 style="text-align: center">Click the button above to login to ${hostname}</h3>
+
       <div style="text-align: center; margin-top: 1rem; font-size: .9rem">
         <div style="color: grey">This link is valid for 30 minutes.</div>
         <a href="${domainUrl}/login" style="margin-top: .4rem; display: block">Click here to request a new link.</a>
+        <div style="color: grey">Be certain the link opens in the same browser you requested it from.</div>
       </div>
         
       <hr style="width: 20%; height: 0px; border: 1px solid lightgrey; margin-top: 2rem; margin-bottom: 2rem">

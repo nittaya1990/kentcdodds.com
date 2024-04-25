@@ -1,18 +1,24 @@
+const hostname =
+  process.env.GITHUB_REF_NAME === 'dev'
+    ? 'kcd-staging.fly.dev'
+    : 'kentcdodds.com'
+
 // try to keep this dep-free so we don't have to install deps
-function postRefreshCache({
-  http = require('https'),
+export async function postRefreshCache({
+  http,
   postData,
   options: {headers: headersOverrides, ...optionsOverrides} = {},
 }) {
+  if (!http) {
+    http = await import('https')
+  }
   return new Promise((resolve, reject) => {
     try {
       const postDataString = JSON.stringify(postData)
-      const searchParams = new URLSearchParams()
-      searchParams.set('_data', 'routes/action/refresh-cache')
       const options = {
-        hostname: 'kentcdodds.com',
+        hostname,
         port: 443,
-        path: `/action/refresh-cache?${searchParams.toString()}`,
+        path: `/action/refresh-cache`,
         method: 'POST',
         headers: {
           auth: process.env.REFRESH_CACHE_SECRET,
@@ -47,5 +53,3 @@ function postRefreshCache({
     }
   })
 }
-
-module.exports = {postRefreshCache}

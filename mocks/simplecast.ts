@@ -1,28 +1,32 @@
-import type {DefaultRequestBody, MockedRequest, RestHandler} from 'msw'
-import {rest} from 'msw'
-import type {
-  SimplecastCollectionResponse,
-  SimpelcastSeasonListItem,
-  SimplecastEpisode,
-  SimplecastEpisodeListItem,
-} from '~/types'
 import {faker} from '@faker-js/faker'
+import {
+  http,
+  type DefaultRequestMultipartBody,
+  type HttpHandler,
+  HttpResponse,
+} from 'msw'
+import {
+  type SimpelcastSeasonListItem,
+  type SimplecastCollectionResponse,
+  type SimplecastEpisode,
+  type SimplecastEpisodeListItem,
+} from '~/types.ts'
 
 const seasonListItems: Array<SimpelcastSeasonListItem> = [
   {
-    href: `https://api.simplecast.com/seasons/${faker.datatype.uuid()}`,
+    href: `https://api.simplecast.com/seasons/${faker.string.uuid()}`,
     number: 1,
   },
   {
-    href: `https://api.simplecast.com/seasons/${faker.datatype.uuid()}`,
+    href: `https://api.simplecast.com/seasons/${faker.string.uuid()}`,
     number: 2,
   },
   {
-    href: `https://api.simplecast.com/seasons/${faker.datatype.uuid()}`,
+    href: `https://api.simplecast.com/seasons/${faker.string.uuid()}`,
     number: 3,
   },
   {
-    href: `https://api.simplecast.com/seasons/${faker.datatype.uuid()}`,
+    href: `https://api.simplecast.com/seasons/${faker.string.uuid()}`,
     number: 4,
   },
 ]
@@ -33,23 +37,23 @@ for (const seasonListItem of seasonListItems) {
   const seasonId = seasonListItem.href.split('/').slice(-1)[0]
   if (!seasonId) throw new Error(`no id for ${seasonListItem.href}`)
   const episodes: Array<SimplecastEpisode> = Array.from(
-    {length: faker.datatype.number({min: 10, max: 24})},
+    {length: faker.number.int({min: 10, max: 24})},
     (v, index) => {
-      const id = faker.datatype.uuid()
+      const id = faker.string.uuid()
       const title = faker.lorem.words()
       const homework = Array.from(
-        {length: faker.datatype.number({min: 1, max: 3})},
+        {length: faker.number.int({min: 1, max: 3})},
         () => faker.lorem.sentence(),
       )
       const resources = Array.from(
-        {length: faker.datatype.number({min: 2, max: 7})},
+        {length: faker.number.int({min: 2, max: 7})},
         () =>
           `[${faker.lorem.sentence()}](https://example.com/${faker.lorem.word()})`,
       )
       const guests = Array.from(
-        {length: faker.datatype.number({min: 1, max: 3})},
+        {length: faker.number.int({min: 1, max: 3})},
         () => {
-          const name = faker.name.findName()
+          const name = faker.person.fullName()
           const username = faker.internet.userName()
           const website = faker.internet.url()
           const links = [
@@ -73,7 +77,7 @@ for (const seasonListItem of seasonListItems) {
         id,
         title,
         is_hidden: false,
-        duration: faker.datatype.number({min: 1700, max: 2500}),
+        duration: faker.number.int({min: 1700, max: 2500}),
         number: index + 1,
         transcription: faker.lorem.paragraphs(30),
         status: 'published',
@@ -86,6 +90,12 @@ for (const seasonListItem of seasonListItems) {
         season: seasonListItem,
         long_description: `
 ${faker.lorem.paragraphs(3)}
+
+<!-- these links are for testing auto-affiliates -->
+
+[egghead.io](https://egghead.io)
+
+[amazon](https://amazon.com)
 
 * * *
 
@@ -131,27 +141,25 @@ ${guest.links.length ? `* ${guest.links.join('\n* ')}` : ''}
   }
 }
 
-const simplecastHandlers: Array<
-  RestHandler<MockedRequest<DefaultRequestBody>>
-> = [
-  rest.get(
+const simplecastHandlers: Array<HttpHandler> = [
+  http.get<any, DefaultRequestMultipartBody>(
     'https://api.simplecast.com/podcasts/:podcastId/seasons',
-    (req, res, ctx) => {
+    () => {
       const response: SimplecastCollectionResponse<SimpelcastSeasonListItem> = {
         collection: seasonListItems,
       }
-      return res(ctx.json(response))
+      return HttpResponse.json(response)
     },
   ),
-  rest.get(
+  http.get<any, DefaultRequestMultipartBody>(
     'https://api.simplecast.com/seasons/:seasonId/episodes',
-    (req, res, ctx) => {
-      if (typeof req.params.seasonId !== 'string') {
+    ({params}) => {
+      if (typeof params.seasonId !== 'string') {
         throw new Error('req.params.seasonId is not a string')
       }
-      const episodes = episodesBySeasonId[req.params.seasonId]
+      const episodes = episodesBySeasonId[params.seasonId]
       if (!episodes) {
-        throw new Error(`No mock episodes by season ID: ${req.params.seasonId}`)
+        throw new Error(`No mock episodes by season ID: ${params.seasonId}`)
       }
       const episodeListItemsResponse: SimplecastCollectionResponse<SimplecastEpisodeListItem> =
         {
@@ -162,16 +170,16 @@ const simplecastHandlers: Array<
             is_published: e.is_published,
           })),
         }
-      return res(ctx.json(episodeListItemsResponse))
+      return HttpResponse.json(episodeListItemsResponse)
     },
   ),
-  rest.get(
+  http.get<any, DefaultRequestMultipartBody>(
     `https://api.simplecast.com/episodes/:episodeId`,
-    (req, res, ctx) => {
-      if (typeof req.params.episodeId !== 'string') {
+    ({params}) => {
+      if (typeof params.episodeId !== 'string') {
         throw new Error('req.params.episodeId is not a string')
       }
-      return res(ctx.json(episodesById[req.params.episodeId]))
+      return HttpResponse.json(episodesById[params.episodeId])
     },
   ),
 ]

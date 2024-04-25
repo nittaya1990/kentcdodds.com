@@ -21,6 +21,15 @@ translations:
     link: https://goongoguma.github.io/2021/04/26/When-to-useMemo-and-useCallback/
   - language: Chinese
     link: https://jancat.github.io/post/2019/translation-usememo-and-usecallback/
+  - language: Italian
+    link: https://aleromano.com/posts/usememo-usecallback
+  - language: Japanese
+    link: https://zenn.dev/matazou/articles/6ea5b90f7980be
+  - language: Português (do Brasil)
+    link: https://medium.com/@diegohferraz/quando-usar-usememo-and-usecallback-2c73a1edc446
+    author:
+      name: Diego H. Ferraz
+      link: https://www.linkedin.com/in/diegohferraz/
 bannerCloudinaryId: unsplash/photo-1554672723-b208dc85134f
 bannerCredit: Photo by [Jp Valery](https://unsplash.com/photos/mQTTDA_kY_8)
 ---
@@ -163,7 +172,7 @@ https://twitter.com/kentcdodds/status/1135943012410830848
 I'd like to mention also that on the second render of the component, the
 original `dispense` function gets garbage collected (freeing up memory space)
 and then a new one is created. However with `useCallback` the original
-`dispense` function wont get garbage collected and a new one is created, so
+`dispense` function won't get garbage collected and a new one is created, so
 you're worse-off from a memory perspective as well.
 
 As a related note, if you have dependencies then it's quite possible React is
@@ -243,7 +252,7 @@ false === false // true
 
 {} === {} // false
 [] === [] // false
-() => {} === () => {} // false
+(() => {}) === (() => {}) // false
 
 const z = {}
 z === z // true
@@ -401,7 +410,7 @@ of the `CountButton`s anyway.
 
 So this is the other situation where `useCallback` and `useMemo` can be of help:
 
-```tsx [7, 10]
+```tsx lines=7, 10
 const CountButton = React.memo(function CountButton({onClick, count}) {
   return <button onClick={onClick}>{count}</button>
 })

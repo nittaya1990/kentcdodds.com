@@ -1,10 +1,10 @@
+import {useFetcher} from '@remix-run/react'
 import * as React from 'react'
-import {useFetcher} from 'remix'
-import {useRootData} from '~/utils/use-root-data'
-import {ArrowButton} from '~/components/arrow-button'
-import {Field} from '~/components/form-elements'
-import {CheckIcon} from '~/components/icons/check-icon'
-import type {ActionData} from './types'
+import {ArrowButton} from '~/components/arrow-button.tsx'
+import {Field} from '~/components/form-elements.tsx'
+import {CheckIcon} from '~/components/icons.tsx'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {type ActionData} from './types.ts'
 
 function ConvertKitForm({
   formId,
@@ -15,10 +15,11 @@ function ConvertKitForm({
   | {convertKitTagId: string; convertKitFormId?: never}
   | {convertKitTagId: string; convertKitFormId: string}
 )) {
-  const convertKit = useFetcher()
+  const websiteId = React.useId()
+  const convertKit = useFetcher<ActionData>()
   const formRef = React.useRef<HTMLFormElement>(null)
-  const convertKitData: ActionData | null =
-    convertKit.type === 'done' ? convertKit.data : null
+  const isDone = convertKit.state === 'idle' && convertKit.data != null
+  const convertKitData = isDone ? convertKit.data : null
   React.useEffect(() => {
     if (formRef.current && convertKitData?.status === 'success') {
       formRef.current.reset()
@@ -37,17 +38,26 @@ function ConvertKitForm({
     )
   }
 
-  const success =
-    convertKit.type === 'done' && convertKitData?.status === 'success'
+  const success = isDone && convertKitData?.status === 'success'
 
   return (
     <convertKit.Form
       ref={formRef}
       action="/action/convert-kit"
-      className="mt-8 space-y-4"
-      method="post"
+      method="POST"
       noValidate
     >
+      <div style={{position: 'absolute', left: '-9999px'}}>
+        <label htmlFor={`website-url-${websiteId}`}>Your website</label>
+        {/* eslint-disable-next-line jsx-a11y/autocomplete-valid */}
+        <input
+          type="text"
+          id={`website-url-${websiteId}`}
+          name="url"
+          tabIndex={-1}
+          autoComplete="nope"
+        />
+      </div>
       <input type="hidden" name="formId" value={formId} />
       <input type="hidden" name="convertKitTagId" value={convertKitTagId} />
       <input type="hidden" name="convertKitFormId" value={convertKitFormId} />

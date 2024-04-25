@@ -1,7 +1,6 @@
-import clsx from 'clsx'
+import {clsx} from 'clsx'
 import * as React from 'react'
-import {CheckIcon} from './icons/check-icon'
-import {CopyIcon} from './icons/copy-icon'
+import {CheckIcon, CopyIcon} from './icons.tsx'
 
 async function copyToClipboard(value: string) {
   try {
@@ -23,23 +22,19 @@ async function copyToClipboard(value: string) {
   }
 }
 
-interface ClipboardCopyButtonProps {
-  value: string
-  className?: string
-  variant?: 'responsive' | 'icon'
-}
-
 enum State {
   Idle = 'idle',
   Copy = 'copy',
   Copied = 'copied',
 }
 
-function ClipboardCopyButton({
+export function ClipboardCopyButton({
   value,
   className,
-  variant = 'responsive',
-}: ClipboardCopyButtonProps) {
+}: {
+  value: string
+  className?: string
+}) {
   const [state, setState] = React.useState<State>(State.Idle)
 
   React.useEffect(() => {
@@ -47,7 +42,7 @@ function ClipboardCopyButton({
       switch (state) {
         case State.Copy: {
           const res = await copyToClipboard(value)
-          console.log('copied', res)
+          console.info('copied', res)
           setState(State.Copied)
           break
         }
@@ -68,19 +63,16 @@ function ClipboardCopyButton({
     <button
       onClick={() => setState(State.Copy)}
       className={clsx(
-        'focus:outline-none whitespace-nowrap rounded-lg bg-white p-3 text-lg font-medium text-black shadow ring-team-current transition hover:opacity-100 hover:shadow-md hover:ring-4 focus:opacity-100 focus:ring-4 group-hover:opacity-100 peer-hover:opacity-100 peer-focus:opacity-100 lg:opacity-0',
-        {'lg:px-8 lg:py-4': variant === 'responsive'},
+        'lg:px-8 lg:py-4 whitespace-nowrap rounded-lg bg-white p-3 text-lg font-medium text-black shadow ring-team-current transition hover:opacity-100 hover:shadow-md hover:ring-4 focus:opacity-100 focus:outline-none focus:ring-4 group-hover:opacity-100 peer-hover:opacity-100 peer-focus:opacity-100 lg:opacity-0',
         className,
       )}
     >
-      <span className={clsx('hidden', {'lg:inline': variant === 'responsive'})}>
+      <span className="sr-only lg:inline lg:not-sr-only">
         {state === State.Copied ? 'Copied to clipboard' : 'Click to copy url'}
       </span>
-      <span className={clsx('inline', {'lg:hidden': variant === 'responsive'})}>
+      <span className="inline lg:sr-only">
         {state === State.Copied ? <CheckIcon /> : <CopyIcon />}
       </span>
     </button>
   )
 }
-
-export {ClipboardCopyButton}

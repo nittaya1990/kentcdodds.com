@@ -1,7 +1,7 @@
-import type {EntryContext} from 'remix'
-import type {KCDHandle, KCDSitemapEntry} from '~/types'
-import {isEqual} from 'lodash'
-import {getDomainUrl, removeTrailingSlash, typedBoolean} from './misc'
+import {type EntryContext} from '@remix-run/node'
+import {isEqual} from '~/utils/cjs/lodash.js'
+import {type KCDHandle, type KCDSitemapEntry} from '~/types.ts'
+import {getDomainUrl, removeTrailingSlash, typedBoolean} from './misc.tsx'
 
 async function getSitemapXml(request: Request, remixContext: EntryContext) {
   const domainUrl = getDomainUrl(request)
@@ -20,6 +20,7 @@ async function getSitemapXml(request: Request, remixContext: EntryContext) {
   const rawSitemapEntries = (
     await Promise.all(
       Object.entries(remixContext.routeModules).map(async ([id, mod]) => {
+        if (!mod) return
         if (id === 'root') return
         if (id.startsWith('routes/_')) return
         if (id.startsWith('__test_routes__')) return

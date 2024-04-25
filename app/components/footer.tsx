@@ -1,18 +1,13 @@
-import * as React from 'react'
-import {externalLinks} from '../external-links'
-import {AnchorOrLink} from '~/utils/misc'
-import {useRootData} from '~/utils/use-root-data'
-import {ConvertKitForm} from '../convertkit/form'
-import {H4, H6, Paragraph} from './typography'
-import {GithubIcon} from './icons/github-icon'
-import {TwitterIcon} from './icons/twitter-icon'
-import {YoutubeIcon} from './icons/youtube-icon'
-import {Signature} from './signature'
-import {Link} from 'remix'
-import {ArrowIcon} from './icons/arrow-icon'
-import {getImgProps, ImageBuilder} from '~/images'
-import {IconLink} from './icon-link'
-import {RssIcon} from './icons/rss-icon'
+import {Link} from '@remix-run/react'
+import {getImgProps, type ImageBuilder} from '~/images.tsx'
+import {AnchorOrLink} from '~/utils/misc.tsx'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {ConvertKitForm} from '../convertkit/form.tsx'
+import {externalLinks} from '../external-links.tsx'
+import {IconLink} from './icon-link.tsx'
+import {ArrowIcon, GithubIcon, RssIcon, XIcon, YoutubeIcon} from './icons.tsx'
+import {Signature} from './signature.tsx'
+import {H4, H6, Paragraph} from './typography.tsx'
 
 function NewsletterSection() {
   return (
@@ -29,13 +24,15 @@ function NewsletterSection() {
             to="/subscribe"
             className="text-secondary underlined hover:text-team-current focus:text-team-current"
           >
-            {`Learn more`}{' '}
+            {`Learn more about the newsletter`}{' '}
             <ArrowIcon className="inline-block" direction="top-right" />
           </Link>
         </Paragraph>
       </div>
 
-      <ConvertKitForm formId="newsletter" convertKitFormId="827139" />
+      <div className="mt-8">
+        <ConvertKitForm formId="newsletter" convertKitFormId="827139" />
+      </div>
     </div>
   )
 }
@@ -77,6 +74,8 @@ function SitemapSection() {
         <FooterLink name="Chats Podcast" href="/chats" />
         <FooterLink name="Workshops" href="/workshops" />
         <FooterLink name="Talks" href="/talks" />
+        <FooterLink name="Testimony" href="/testimony" />
+        <FooterLink name="Testimonials" href="/testimonials" />
         <FooterLink name="About" href="/about" />
         <FooterLink name="Credits" href="/credits" />
         <FooterLink name="Sitemap.xml" reload href="/sitemap.xml" />
@@ -103,7 +102,7 @@ function AboutSection() {
             <YoutubeIcon size={32} />
           </IconLink>
           <IconLink href={externalLinks.twitter}>
-            <TwitterIcon size={32} />
+            <XIcon size={32} />
           </IconLink>
           <IconLink href={externalLinks.rss}>
             <RssIcon size={32} />
@@ -133,7 +132,7 @@ function FooterLink({
       <AnchorOrLink
         prefetch={href.startsWith('http') ? undefined : 'intent'}
         href={href}
-        className="text-secondary underlined focus:outline-none inline-block whitespace-nowrap text-lg hover:text-team-current focus:text-team-current"
+        className="text-secondary underlined inline-block whitespace-nowrap text-lg hover:text-team-current focus:text-team-current focus:outline-none"
         reload={reload}
       >
         {name}
@@ -150,17 +149,14 @@ function Footer({image}: {image: ImageBuilder}) {
       ({name}) => name === 'Subscribed: general newsletter',
     )
   const featuredImg = (
-    <div className="aspect-w-4 aspect-h-3">
+    <div className="aspect-[4/3]">
       <img
-        className="w-full rounded-sm object-contain"
+        loading="lazy"
         {...getImgProps(image, {
-          widths: [300, 600, 850, 1600, 2550],
-          sizes: [
-            '(max-width: 639px) 80vw',
-            '(min-width: 640px) and (max-width: 1499px) 50vw',
-            '(min-width: 1500px) and (max-width: 1620px) 25vw',
-            '410px',
-          ],
+          className:
+            'w-full rounded-sm object-contain max-w-[400px] max-h-[400px]',
+          widths: [300, 800],
+          sizes: ['(max-width: 639px) 80vw', '400px'],
           transformations: {
             resize: {
               aspectRatio: '4:3',
@@ -203,7 +199,7 @@ function Footer({image}: {image: ImageBuilder}) {
             {subscribedToNewsletter ? featuredImg : <NewsletterSection />}
           </div>
 
-          <div className="col-span-full mt-24 text-lg text-gray-500 dark:text-blueGray-500 md:mt-44">
+          <div className="col-span-full mt-24 text-lg text-gray-500 dark:text-slate-500 md:mt-44">
             <span>All rights reserved</span>{' '}
             <span className="block md:inline">{`© Kent C. Dodds ${new Date().getFullYear()}`}</span>
           </div>

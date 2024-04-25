@@ -1,14 +1,19 @@
-import type {DefaultRequestBody, MockedRequest, RestHandler} from 'msw'
-import {rest} from 'msw'
-import type {
-  TransistorEpisodesJson,
-  TransistorPublishedJson,
-  TransistorAuthorizedJson,
-  TransistorCreatedJson,
-  TransistorEpisodeData,
-} from '~/types'
 import {faker} from '@faker-js/faker'
-import {requiredParam, requiredHeader, requiredProperty} from './utils'
+import {
+  http,
+  type DefaultRequestMultipartBody,
+  type HttpHandler,
+  HttpResponse,
+  type DefaultBodyType,
+} from 'msw'
+import {
+  type TransistorAuthorizedJson,
+  type TransistorCreatedJson,
+  type TransistorEpisodeData,
+  type TransistorEpisodesJson,
+  type TransistorPublishedJson,
+} from '~/types.ts'
+import {requiredHeader, requiredParam, requiredProperty} from './utils.ts'
 
 function makeEpisode(
   overrides: {
@@ -16,19 +21,19 @@ function makeEpisode(
     attributes?: Partial<TransistorEpisodeData['attributes']>
   } = {},
 ): TransistorEpisodeData {
-  const publishedAt = faker.datatype.datetime({
-    max: Date.now() - 1000 * 60 * 60 * 24,
-    min: Date.now() - 1000 * 60 * 60 * 24 * 7 * 6,
+  const publishedAt = faker.date.between({
+    from: Date.now() - 1000 * 60 * 60 * 24 * 7 * 6,
+    to: Date.now() - 1000 * 60 * 60 * 24,
   })
   return {
-    id: faker.datatype.uuid(),
+    id: faker.string.uuid(),
     type: 'episode',
     ...overrides,
     attributes: {
       number: 0,
       season: 1,
       title: faker.lorem.words(),
-      duration: faker.datatype.number({min: 180, max: 900}),
+      duration: faker.number.float({min: 180, max: 900}),
       summary: faker.lorem.sentence(),
       description: faker.lorem.paragraphs(2),
       keywords: faker.lorem.words().split(' ').join(','),
@@ -42,10 +47,10 @@ function makeEpisode(
         '<iframe src="https://share.transistor.fm/e/1493e91f/dark" width="100%" height="180" frameborder="0" scrolling="no" seamless style="width:100%; height:180px;"></iframe>',
       published_at: publishedAt.toISOString(),
       audio_processing: false,
-      updated_at: faker.datatype
-        .datetime({
-          max: Date.now() - 1000 * 60 * 60 * 23,
-          min: publishedAt.getTime(),
+      updated_at: faker.date
+        .between({
+          from: publishedAt.getTime(),
+          to: Date.now() - 1000 * 60 * 60 * 23,
         })
         .toISOString(),
       ...overrides.attributes,
@@ -54,18 +59,24 @@ function makeEpisode(
 }
 
 const episodes: Array<TransistorEpisodeData> = Array.from(
-  {length: 35},
-  (item, index) => makeEpisode({attributes: {number: index + 1}}),
+  {length: 99},
+  (item, index) =>
+    makeEpisode({
+      attributes: {
+        season: Math.ceil((index + 1) / 50),
+        number: (index % 50) + 1,
+      },
+    }),
 )
 
-const transistorHandlers: Array<
-  RestHandler<MockedRequest<DefaultRequestBody>>
-> = [
-  rest.get(
+const transistorHandlers: Array<HttpHandler> = [
+  http.get<any, DefaultRequestMultipartBody>(
     'https://api.transistor.fm/v1/episodes/authorize_upload',
-    async (req, res, ctx) => {
-      requiredParam(req.url.searchParams, 'filename')
-      requiredHeader(req.headers, 'x-api-key')
+    async ({request}) => {
+      const url = new URL(request.url)
+
+      requiredParam(url.searchParams, 'filename')
+      requiredHeader(request.headers, 'x-api-key')
       const data: TransistorAuthorizedJson = {
         data: {
           attributes: {
@@ -77,98 +88,106 @@ const transistorHandlers: Array<
           },
         },
       }
-      return res(ctx.json(data))
+      return HttpResponse.json(data)
     },
   ),
 
-  rest.put(
+  http.put<any, DefaultRequestMultipartBody>(
     'https://transistorupload.s3.amazonaws.com/uploads/api/:bucketId/:fileId',
-    async (req, res, ctx) => {
-      if (!req.body) {
-        throw new Error('req.body is required')
+    async ({request}) => {
+      const body = await request.blob()
+
+      if (!body.size) {
+        throw new Error('body is required')
       }
 
-      return res(
-        ctx.json({
-          // we don't use the response so no need to put something real here.
-        }),
-      )
+      return HttpResponse.json({
+        // we don't use the response so no need to put something real here.
+      })
     },
   ),
 
-  rest.post('https://api.transistor.fm/v1/episodes', async (req, res, ctx) => {
-    if (!req.body || typeof req.body !== 'object') {
-      throw new Error('req.body must be an object')
-    }
-    requiredHeader(req.headers, 'x-api-key')
-    requiredProperty(req.body, 'episode')
-    requiredProperty(req.body.episode, 'show_id')
-    requiredProperty(req.body.episode, 'season')
-    requiredProperty(req.body.episode, 'audio_url')
-    requiredProperty(req.body.episode, 'title')
-    requiredProperty(req.body.episode, 'summary')
-    requiredProperty(req.body.episode, 'description')
-    const episode: TransistorEpisodeData = makeEpisode({
-      attributes: {
-        number: Math.max(...episodes.map(e => e.attributes.number ?? 0)) + 1,
-        ...req.body.episode,
-      },
-    })
-    const data: TransistorCreatedJson = {data: episode}
-    episodes.push(episode)
-    return res(ctx.json(data))
-  }),
+  http.post<any, DefaultBodyType>(
+    'https://api.transistor.fm/v1/episodes',
+    async ({request}) => {
+      const body = await request.json()
 
-  rest.patch(
-    'https://api.transistor.fm/v1/episodes/:episodeId/publish',
-    async (req, res, ctx) => {
-      if (!req.body || typeof req.body !== 'object') {
+      if (!body || typeof body !== 'object') {
         throw new Error('req.body must be an object')
       }
-      requiredProperty(req.body, 'episode')
-      requiredHeader(req.headers, 'x-api-key')
-      if (req.body.episode.status !== 'published') {
+      requiredHeader(request.headers, 'x-api-key')
+      requiredProperty(body, 'episode')
+      requiredProperty(body.episode, 'show_id')
+      requiredProperty(body.episode, 'season')
+      requiredProperty(body.episode, 'audio_url')
+      requiredProperty(body.episode, 'title')
+      requiredProperty(body.episode, 'summary')
+      requiredProperty(body.episode, 'description')
+      const episode: TransistorEpisodeData = makeEpisode({
+        attributes: {
+          number: Math.max(...episodes.map(e => e.attributes.number ?? 0)) + 1,
+          ...body.episode,
+        },
+      })
+      const data: TransistorCreatedJson = {data: episode}
+      episodes.push(episode)
+      return HttpResponse.json(data)
+    },
+  ),
+
+  http.patch<any, DefaultBodyType>(
+    'https://api.transistor.fm/v1/episodes/:episodeId/publish',
+    async ({request, params}) => {
+      const body = await request.json()
+
+      if (!body || typeof body !== 'object') {
+        throw new Error('req.body must be an object')
+      }
+      requiredProperty(body, 'episode')
+      requiredHeader(request.headers, 'x-api-key')
+      if (body.episode.status !== 'published') {
         throw new Error(
-          `req.body.episode.status must be published. Was "${req.body.episode.status}"`,
+          `req.body.episode.status must be published. Was "${body.episode.status}"`,
         )
       }
-      const episode = episodes.find(e => e.id === req.params.episodeId)
+      const episode = episodes.find(e => e.id === params.episodeId)
       if (!episode) {
-        throw new Error(
-          `No episode exists with the id of ${req.params.episodeId}`,
-        )
+        throw new Error(`No episode exists with the id of ${params.episodeId}`)
       }
       episode.attributes.status = 'published'
       const data: TransistorPublishedJson = {data: episode}
-      return res(ctx.json(data))
+      return HttpResponse.json(data)
     },
   ),
 
-  rest.patch(
+  http.patch<any, DefaultBodyType>(
     'https://api.transistor.fm/v1/episodes/:episodeId',
-    async (req, res, ctx) => {
-      if (!req.body || typeof req.body !== 'object') {
+    async ({request, params}) => {
+      const body = await request.json()
+
+      if (!body || typeof body !== 'object') {
         throw new Error('req.body must be an object')
       }
-      requiredProperty(req.body, 'episode')
-      requiredHeader(req.headers, 'x-api-key')
-      const episode = episodes.find(e => e.id === req.params.episodeId)
+      requiredProperty(body, 'episode')
+      requiredHeader(request.headers, 'x-api-key')
+      const episode = episodes.find(e => e.id === params.episodeId)
       if (!episode) {
-        throw new Error(
-          `No episode exists with the id of ${req.params.episodeId}`,
-        )
+        throw new Error(`No episode exists with the id of ${params.episodeId}`)
       }
-      Object.assign(episode, req.body.episode)
+      Object.assign(episode, body.episode)
       const data: TransistorPublishedJson = {data: episode}
-      return res(ctx.json(data))
+      return HttpResponse.json(data)
     },
   ),
 
-  rest.get('https://api.transistor.fm/v1/episodes', async (req, res, ctx) => {
-    requiredHeader(req.headers, 'x-api-key')
-    const data: TransistorEpisodesJson = {data: episodes}
-    return res(ctx.json(data))
-  }),
+  http.get<any, DefaultRequestMultipartBody>(
+    'https://api.transistor.fm/v1/episodes',
+    async ({request}) => {
+      requiredHeader(request.headers, 'x-api-key')
+      const data: TransistorEpisodesJson = {data: episodes}
+      return HttpResponse.json(data)
+    },
+  ),
 ]
 
 export {transistorHandlers}

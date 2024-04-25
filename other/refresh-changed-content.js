@@ -1,17 +1,27 @@
 // try to keep this dep-free so we don't have to install deps
-const {getChangedFiles, fetchJson} = require('./get-changed-files')
-const {postRefreshCache} = require('./utils')
+import {getChangedFiles, fetchJson} from './get-changed-files.js'
+import {postRefreshCache} from './utils.js'
 
 const [currentCommitSha] = process.argv.slice(2)
 
+const baseUrl =
+  process.env.GITHUB_REF_NAME === 'dev'
+    ? 'https://kcd-staging.fly.dev'
+    : 'https://kentcdodds.com'
+
 async function go() {
-  const shaInfo = await fetchJson(
-    'https://kentcdodds.com/refresh-commit-sha.json',
-  )
+  const shaInfo = await fetchJson(`${baseUrl}/refresh-commit-sha.json`, {
+    timeoutTime: 10_000,
+  })
   let compareSha = shaInfo?.sha
   if (!compareSha) {
-    const buildInfo = await fetchJson('https://kentcdodds.com/build/info.json')
+    const buildInfo = await fetchJson(`${baseUrl}/build/info.json`, {
+      timeoutTime: 10_000,
+    })
     compareSha = buildInfo.commit.sha
+    console.log(
+      `No compare sha found, using build sha: ${buildInfo.commit.sha}`,
+    )
   }
   if (typeof compareSha !== 'string') {
     console.log('🤷‍♂️ No sha to compare to. Unsure what to refresh.')

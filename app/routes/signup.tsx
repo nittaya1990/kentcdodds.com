@@ -1,25 +1,35 @@
+import {
+  json,
+  redirect,
+  type ActionFunction,
+  type DataFunctionArgs,
+} from '@remix-run/node'
+import {Form, useActionData, useLoaderData} from '@remix-run/react'
+import {clsx} from 'clsx'
+import {shuffle} from '~/utils/cjs/lodash.js'
 import * as React from 'react'
-import {json, redirect, useLoaderData, useActionData, Form} from 'remix'
-import type {ActionFunction, LoaderFunction} from 'remix'
-import clsx from 'clsx'
-import {shuffle} from 'lodash'
-import type {KCDHandle, Team} from '~/types'
-import {useTeam} from '~/utils/team-provider'
-import {getSession, getUser} from '~/utils/session.server'
-import {getLoginInfoSession} from '~/utils/login.server'
-import {prismaWrite, prismaRead, validateMagicLink} from '~/utils/prisma.server'
-import {getErrorStack, teams} from '~/utils/misc'
-import {tagKCDSiteSubscriber} from '../convertkit/convertkit.server'
-import {Grid} from '~/components/grid'
-import {H2, H6, Paragraph} from '~/components/typography'
-import {Field, InputError} from '~/components/form-elements'
-import {Button} from '~/components/button'
-import {CheckCircledIcon} from '~/components/icons/check-circled-icon'
-import {getImgProps, images} from '~/images'
-import {TEAM_MAP} from '~/utils/onboarding'
-import {HeaderSection} from '~/components/sections/header-section'
-import {handleFormSubmission} from '~/utils/actions.server'
-import {Spacer} from '~/components/spacer'
+import {Button} from '~/components/button.tsx'
+import {Field, InputError} from '~/components/form-elements.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {CheckCircledIcon} from '~/components/icons.tsx'
+import {HeaderSection} from '~/components/sections/header-section.tsx'
+import {Spacer} from '~/components/spacer.tsx'
+import {H2, H6, Paragraph} from '~/components/typography.tsx'
+import {tagKCDSiteSubscriber} from '~/convertkit/convertkit.server.ts'
+import {getImgProps, images} from '~/images.tsx'
+import {type KCDHandle, type Team} from '~/types.ts'
+import {handleFormSubmission} from '~/utils/actions.server.ts'
+import {getClientSession} from '~/utils/client.server.ts'
+import {getLoginInfoSession} from '~/utils/login.server.ts'
+import {getErrorStack, isTeam, teams} from '~/utils/misc.tsx'
+import {
+  TEAM_ONEWHEELING_MAP,
+  TEAM_SKIING_MAP,
+  TEAM_SNOWBOARD_MAP,
+} from '~/utils/onboarding.ts'
+import {prisma, validateMagicLink} from '~/utils/prisma.server.ts'
+import {getSession, getUser} from '~/utils/session.server.ts'
+import {useTeam} from '~/utils/team-provider.tsx'
 
 export const handle: KCDHandle = {
   getSitemapEntries: () => null,
@@ -38,11 +48,6 @@ type ActionData = {
   }
 }
 
-type LoaderData = {
-  email: string
-  teamsInOrder: Array<Team>
-}
-
 function getErrorForFirstName(name: string | null) {
   if (!name) return `Name is required`
   if (name.length > 60) return `Name is too long`
@@ -51,7 +56,7 @@ function getErrorForFirstName(name: string | null) {
 
 function getErrorForTeam(team: string | null) {
   if (!team) return `Team is required`
-  if (!teams.includes(team as Team)) return `Please choose a valid team`
+  if (!isTeam(team)) return `Please choose a valid team`
   return null
 }
 
@@ -103,20 +108,35 @@ export const action: ActionFunction = async ({request}) => {
       const {firstName, team} = formData
 
       try {
-        const user = await prismaWrite.user.create({
+        const user = await prisma.user.create({
           data: {email, firstName, team},
         })
 
         // add user to mailing list
-        const sub = await tagKCDSiteSubscriber(user)
-        await prismaWrite.user.update({
+        const sub = await tagKCDSiteSubscriber({
+          email,
+          firstName,
+          fields: {kcd_team: team, kcd_site_id: user.id},
+        })
+        await prisma.user.update({
           data: {convertKitId: String(sub.id)},
           where: {id: user.id},
         })
+        const clientSession = await getClientSession(request, null)
+        const clientId = clientSession.getClientId()
+        // update all PostReads from clientId to userId
+        if (clientId) {
+          await prisma.postRead.updateMany({
+            data: {userId: user.id, clientId: null},
+            where: {clientId},
+          })
+        }
+        clientSession.setUser(user)
 
         const headers = new Headers()
         await session.signIn(user)
         await session.getHeaders(headers)
+        await clientSession.getHeaders(headers)
         // IDEA: try using destroy... Didn't seem to work last time I tried though.
         loginInfoSession.clean()
         await loginInfoSession.getHeaders(headers)
@@ -135,7 +155,7 @@ export const action: ActionFunction = async ({request}) => {
   })
 }
 
-export const loader: LoaderFunction = async ({request}) => {
+export async function loader({request}: DataFunctionArgs) {
   const user = await getUser(request)
   if (user) return redirect('/me')
 
@@ -150,7 +170,7 @@ export const loader: LoaderFunction = async ({request}) => {
     })
   }
 
-  const userForMagicLink = await prismaRead.user.findFirst({
+  const userForMagicLink = await prisma.user.findFirst({
     where: {email},
     select: {id: true},
   })
@@ -166,24 +186,35 @@ export const loader: LoaderFunction = async ({request}) => {
     })
   }
 
-  const values: LoaderData = {
-    email,
-    // have to put this shuffle in the loader to ensure server render is the same as the client one.
-    teamsInOrder: shuffle(teams),
-  }
-  return json(values, {
-    headers: await loginInfoSession.getHeaders(),
-  })
+  const activities = ['skiing', 'snowboarding', 'onewheeling'] as const
+  const activity: 'skiing' | 'snowboarding' | 'onewheeling' =
+    activities[Math.floor(Math.random() * activities.length)] ?? 'skiing'
+  return json(
+    {
+      email,
+      // have to put this shuffle in the loader to ensure server render is the same as the client one.
+      teamsInOrder: shuffle(teams),
+      teamMap: activity,
+    } as const,
+    {
+      headers: await loginInfoSession.getHeaders(),
+    },
+  )
 }
 
 interface TeamOptionProps {
+  teamMap: 'skiing' | 'snowboarding' | 'onewheeling'
   team: Team
   error?: string | null
   selected: boolean
 }
 
-function TeamOption({team: value, error, selected}: TeamOptionProps) {
-  const team = TEAM_MAP[value]
+function TeamOption({teamMap, team: value, error, selected}: TeamOptionProps) {
+  const team = {
+    skiing: TEAM_SKIING_MAP,
+    snowboarding: TEAM_SNOWBOARD_MAP,
+    onewheeling: TEAM_ONEWHEELING_MAP,
+  }[teamMap][value]
 
   return (
     <div
@@ -210,8 +241,8 @@ function TeamOption({team: value, error, selected}: TeamOptionProps) {
           aria-describedby={error ? 'team-error' : undefined}
         />
         <img
-          className="mx-auto mb-16 block"
           {...getImgProps(team.image, {
+            className: 'mx-auto mb-16 block',
             widths: [350, 512, 685, 1370, 2055],
             sizes: [
               '(max-width: 1023px) 65vw',
@@ -227,7 +258,7 @@ function TeamOption({team: value, error, selected}: TeamOptionProps) {
 }
 
 export default function NewAccount() {
-  const data = useLoaderData<LoaderData>()
+  const data = useLoaderData<typeof loader>()
   const actionData = useActionData<ActionData>()
   const [, setTeam] = useTeam()
   const [formValues, setFormValues] = React.useState<{
@@ -257,7 +288,7 @@ export default function NewAccount() {
       />
       <main>
         <Form
-          method="post"
+          method="POST"
           onChange={event => {
             const form = event.currentTarget
             setFormValues({
@@ -281,6 +312,7 @@ export default function NewAccount() {
               {data.teamsInOrder.map(teamOption => (
                 <TeamOption
                   key={teamOption}
+                  teamMap={data.teamMap}
                   team={teamOption}
                   error={actionData?.errors.team}
                   selected={formValues.team === teamOption}
@@ -349,7 +381,7 @@ export default function NewAccount() {
         </Form>
         <Spacer size="2xs" />
         <Grid>
-          <Form method="post">
+          <Form method="POST">
             <input type="hidden" name="actionId" value={actionIds.cancel} />
             <Button type="submit" variant="danger">
               {`Cancel`}
@@ -396,10 +428,10 @@ export default function NewAccount() {
           </div>
 
           <div className="col-span-full lg:col-span-6 lg:col-start-1 lg:row-start-1">
-            <div className="aspect-h-6 aspect-w-4">
+            <div className="aspect-[4/6]">
               <img
-                className="rounded-lg object-cover"
                 {...getImgProps(images.kentPalmingSoccerBall, {
+                  className: 'rounded-lg object-cover',
                   widths: [512, 650, 840, 1024, 1300, 1680, 2000, 2520],
                   sizes: [
                     '(max-width: 1023px) 80vw',

@@ -17,15 +17,18 @@ meta:
 translations:
   - language: Русский
     link: https://habr.com/ru/post/507572/
-  - language: Español
-    link: https://julianbetancourt.co/blog/manejo-de-estados-de-aplicacion-en-react
   - language: 한국어
     link: https://im-developer.tistory.com/222
   - language: 中文
-    link: https://liyanlance.github.io/docs/react-state-management
+    link: https://liyanlance.github.io/#/frontend/react-state-management
     author:
       name: Li Yan
       link: https://liyanlance.github.io/
+  - language: Türkçe
+    link: https://medium.com/@gizemnkorkmaz/react-ile-application-state-y%C3%B6netimi-fe4c2adabc49
+    author:
+      name: Gizem Korkmaz
+      link: https://twitter.com/gizemnkorkmaz
 bannerCloudinaryId: unsplash/photo-1513346940221-6f673d962e97
 bannerCredit: Photo by [Rene Böhmer](https://unsplash.com/photos/YeUVDKZWSZ4)
 ---
@@ -102,7 +105,7 @@ location. Instead, you let each individual component manage that and it ends up
 being a really effective way to build your UI. You can do this with your state
 as well, and it's very likely that you do today:
 
-```tsx [2]
+```tsx lines=2
 function Counter() {
   const [count, setCount] = React.useState(0)
   const increment = () => setCount(c => c + 1)
@@ -120,7 +123,7 @@ Note that everything I'm talking about here works with class components as well.
 Hooks just make things a bit easier (especially context which we'll get into in
 a minute).
 
-```tsx [2]
+```tsx lines=2
 class Counter extends React.Component {
   state = {count: 0}
   increment = () => this.setState(({count}) => ({count: count + 1}))
@@ -134,7 +137,7 @@ class Counter extends React.Component {
 is easy, but what do you do when I need to share that state across components?
 For example, what if I wanted to do this:"
 
-```tsx [3]
+```tsx lines=3
 function CountDisplay() {
   // where does `count` come from?
   return <div>The current counter count is {count}</div>

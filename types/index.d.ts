@@ -1,9 +1,8 @@
-/// <reference types="@remix-run/dev" />
-/// <reference types="@remix-run/node/globals" />
+/// <reference types="@remix-run/node" />
+/// <reference types="vite/client" />
 
-import calculateReadingTime from 'reading-time'
-import type {ActionFunction, LoaderFunction} from 'remix'
-import type {User, Call, Session, Team, Role} from '@prisma/client'
+import {type Call, type Session, type User} from '@prisma/client'
+import type calculateReadingTime from 'reading-time'
 
 type NonNullProperties<Type> = {
   [Key in keyof Type]-?: Exclude<Type[Key], null | undefined>
@@ -15,6 +14,7 @@ type MdxPage = {
   slug: string
   editLink: string
   readTime?: ReturnType<typeof calculateReadingTime>
+  dateDisplay?: string
 
   /**
    * It's annoying that all these are set to optional I know, but there's
@@ -26,6 +26,7 @@ type MdxPage = {
   frontmatter: {
     archived?: boolean
     draft?: boolean
+    unlisted?: boolean
     title?: string
     description?: string
     meta?: {
@@ -125,7 +126,7 @@ type CWKEpisode = {
     name: string
     company?: string
     github?: string
-    twitter?: string
+    x?: string
   }>
   duration: number
   transcriptHTML: string
@@ -151,6 +152,11 @@ type CWKListItem = Pick<
 type CWKSeason = {
   seasonNumber: number
   episodes: Array<CWKListItem>
+}
+
+type CallKentSeason = {
+  seasonNumber: number
+  episodes: Array<CallKentEpisode>
 }
 
 type CallKentEpisode = {
@@ -188,30 +194,23 @@ type KCDSitemapEntry = {
 type KCDHandle = {
   /** this just allows us to identify routes more directly rather than relying on pathnames */
   id?: string
-  /** this is here to allow us to disable scroll restoration until Remix gives us better control */
-  restoreScroll?: false
-  getSitemapEntries?: (
-    request: Request,
-  ) =>
-    | Promise<Array<KCDSitemapEntry | null> | null>
-    | Array<KCDSitemapEntry | null>
+  getSitemapEntries?:
+    | ((
+        request: Request,
+      ) =>
+        | Promise<Array<KCDSitemapEntry | null> | null>
+        | Array<KCDSitemapEntry | null>
+        | null)
     | null
 }
 
-type KCDLoader<
-  Params extends Record<string, unknown> = Record<string, unknown>,
-> = (
-  args: Omit<Parameters<LoaderFunction>['0'], 'params'> & {params: Params},
-) => ReturnType<LoaderFunction>
-
-type KCDAction<
-  Params extends Record<string, unknown> = Record<string, unknown>,
-> = (
-  args: Omit<Parameters<ActionFunction>['0'], 'params'> & {params: Params},
-) => ReturnType<ActionFunction>
-
 type GitHubFile = {path: string; content: string}
+type Team = 'RED' | 'BLUE' | 'YELLOW'
+type Role = 'ADMIN' | 'MEMBER'
+type OptionalTeam = Team | 'UNKNOWN'
 
+export * from './simplecast.ts'
+export * from './transistor.ts'
 export {
   NonNullProperties,
   Await,
@@ -220,19 +219,16 @@ export {
   Session,
   Team,
   Role,
+  OptionalTeam,
   MdxPage,
   MdxListItem,
   Workshop,
   CWKEpisode,
   CWKListItem,
   CWKSeason,
+  CallKentSeason,
   CallKentEpisode,
-  KCDLoader,
-  KCDAction,
   KCDHandle,
   KCDSitemapEntry,
   GitHubFile,
 }
-
-export * from './simplecast'
-export * from './transistor'

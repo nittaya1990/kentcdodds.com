@@ -14,6 +14,8 @@ meta:
 translations:
   - language: 繁體中文
     link: https://medium.com/enjoy-life-enjoy-coding/react-unit-test-%E8%AE%93%E4%BD%A0%E7%9A%84-ui-%E6%B8%AC%E8%A9%A6%E9%81%A9%E6%87%89%E8%AE%8A%E5%8C%96-%E7%BF%BB%E8%AD%AF-b9b2c1c4110f
+  - language: 日本語
+    link: https://makotot.dev/posts/making-your-ui-tests-resilient-to-change-translation-ja
 bannerCloudinaryId: unsplash/photo-1492567291473-fe3dfc175b45
 bannerCredit: Photo by [Warren Wong](https://unsplash.com/photos/tHiGKAJxaA8)
 ---
@@ -58,7 +60,7 @@ const submitButton = rootNode.querySelector('.btn')
 And here's where the problem comes in. What happens when we add another button?
 What if we added a "Sign up" button before the "Login" button?
 
-```tsx [12-14]
+```tsx lines=12-14
 const form = (
   <form onSubmit={handleSubmit}>
     <div>
@@ -139,6 +141,12 @@ like this:
 1. Type a fake username in the input labeled `username`
 2. Type a fake password in the input labeled `password`
 3. Click on the button that has text `sign in`
+
+```js
+const usernameField = rootNode.getByRole('textbox', {name: /username/i})
+const passwordField = rootNode.getByLabelText('password')
+const submitButton = rootNode.getByRole('button', {name: /sign in/i})
+```
 
 And that would help to ensure that you are testing your software as closely to
 how it's used as possible. Giving you more value from your test.

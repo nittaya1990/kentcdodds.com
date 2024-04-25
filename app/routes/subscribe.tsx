@@ -1,37 +1,36 @@
-import * as React from 'react'
-import {json, Link, useLoaderData} from 'remix'
-import type {LoaderFunction, MetaFunction} from 'remix'
-import {ButtonLink} from '~/components/button'
-import {Grid} from '~/components/grid'
-import {MailIcon} from '~/components/icons/mail-icon'
-import {BlogSection} from '~/components/sections/blog-section'
-import {HeroSection} from '~/components/sections/hero-section'
-import {H2, H3, H6, Paragraph} from '~/components/typography'
-import {ConvertKitForm} from '~/convertkit/form'
-import {getGenericSocialImage, getImgProps, images} from '~/images'
-import type {Await} from '~/types'
-import {getBlogRecommendations} from '~/utils/blog.server'
-import {useRootData} from '~/utils/use-root-data'
-import {getSocialMetas} from '~/utils/seo'
-import {getDisplayUrl, getUrl} from '~/utils/misc'
-import type {LoaderData as RootLoaderData} from '../root'
+import {json, type LoaderFunction, type MetaFunction} from '@remix-run/node'
+import {Link, useLoaderData} from '@remix-run/react'
+import {ButtonLink} from '~/components/button.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {MailIcon} from '~/components/icons.tsx'
+import {BlogSection} from '~/components/sections/blog-section.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {H2, H3, H6, Paragraph} from '~/components/typography.tsx'
+import {ConvertKitForm} from '~/convertkit/form.tsx'
+import {getGenericSocialImage, getImgProps, images} from '~/images.tsx'
+import {type Await} from '~/types.ts'
+import {getBlogRecommendations} from '~/utils/blog.server.ts'
+import {getDisplayUrl, getUrl} from '~/utils/misc.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {getServerTimeHeader} from '~/utils/timing.server.ts'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {type RootLoaderType} from '~/root.tsx'
 
-export const meta: MetaFunction = ({parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: `Subscribe to the KCD Mailing List`,
-      description: `Get weekly insights, ideas, and proven coding practices from the KCD Mailing List`,
-      url: getUrl(requestInfo),
-      image: getGenericSocialImage({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: images.snowboard(),
-        words: `Subscribe to the KCD Mailing List`,
-      }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  return getSocialMetas({
+    title: `Subscribe to the KCD Mailing List`,
+    description: `Get weekly insights, ideas, and proven coding practices from the KCD Mailing List`,
+    url: getUrl(requestInfo),
+    image: getGenericSocialImage({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: images.snowboard(),
+      words: `Subscribe to the KCD Mailing List`,
     }),
-  }
+  })
 }
 
 type LoaderData = {
@@ -39,13 +38,15 @@ type LoaderData = {
 }
 
 export const loader: LoaderFunction = async ({request}) => {
-  const blogRecommendations = await getBlogRecommendations(request)
+  const timings = {}
+  const blogRecommendations = await getBlogRecommendations({request, timings})
   const data: LoaderData = {blogRecommendations}
 
   return json(data, {
     headers: {
       'Cache-Control': 'private, max-age=3600',
       Vary: 'Cookie',
+      'Server-Timing': getServerTimeHeader(timings),
     },
   })
 }
@@ -73,10 +74,10 @@ export default function SubscribeScreen() {
       <main>
         <Grid className="mb-24 lg:mb-64">
           <div className="col-span-full lg:col-span-6 lg:col-start-1">
-            <div className="aspect-h-3 aspect-w-4 mb-12 lg:mb-0">
+            <div className="aspect-[4/3] mb-12 lg:mb-0">
               <img
-                className="rounded-lg object-cover"
                 {...getImgProps(images.kentCodingWithSkates, {
+                  className: 'rounded-lg object-cover',
                   widths: [410, 650, 820, 1230, 1640, 2460],
                   sizes: [
                     '(max-width: 1023px) 80vw',
@@ -167,7 +168,10 @@ export default function SubscribeScreen() {
                 <H3>{`Sign up here`}</H3>
                 <Paragraph>{`And get your first email this week!`}</Paragraph>
               </div>
-              <div id="subscribe-form" className="col-span-full lg:col-span-7">
+              <div
+                id="subscribe-form"
+                className="col-span-full mt-8 lg:col-span-7"
+              >
                 <ConvertKitForm formId="newsletter" convertKitFormId="827139" />
               </div>
             </>

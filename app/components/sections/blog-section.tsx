@@ -1,10 +1,9 @@
-import clsx from 'clsx'
-import * as React from 'react'
-import type {MdxListItem} from '~/types'
-import {Grid} from '../grid'
-import {ArticleCard} from '../article-card'
-import {HeaderSection} from './header-section'
-import {Spacer} from '../spacer'
+import {clsx} from 'clsx'
+import {type MdxListItem} from '~/types.ts'
+import {ArticleCard} from '../article-card.tsx'
+import {Grid} from '../grid.tsx'
+import {Spacer} from '../spacer.tsx'
+import {HeaderSection} from './header-section.tsx'
 
 interface BlogSectionProps {
   articles: Array<MdxListItem>
@@ -19,6 +18,8 @@ function BlogSection({
   description,
   showArrowButton = true,
 }: BlogSectionProps) {
+  if (!articles.length) return null
+
   return (
     <>
       <HeaderSection

@@ -1,4 +1,4 @@
-import {getRequiredServerEnvVar} from '../utils/misc'
+import {getRequiredServerEnvVar} from '../utils/misc.tsx'
 
 const CONVERT_KIT_API_SECRET = getRequiredServerEnvVar('CONVERT_KIT_API_SECRET')
 const CONVERT_KIT_API_KEY = getRequiredServerEnvVar('CONVERT_KIT_API_KEY')
@@ -89,7 +89,7 @@ async function addSubscriberToForm({
   const response = await fetch(
     `https://api.convertkit.com/v3/forms/${convertKitFormId}/subscribe`,
     {
-      method: 'post',
+      method: 'POST',
       body: JSON.stringify(subscriberData),
       headers: {'Content-Type': 'application/json'},
     },
@@ -119,7 +119,7 @@ async function addTagToSubscriber({
 
   const subscribeUrl = `https://api.convertkit.com/v3/tags/${convertKitTagId}/subscribe`
   const response = await fetch(subscribeUrl, {
-    method: 'post',
+    method: 'POST',
     body: JSON.stringify(subscriberData),
     headers: {
       'Content-Type': 'application/json',
@@ -134,11 +134,11 @@ async function addTagToSubscriber({
 async function tagKCDSiteSubscriber({
   email,
   firstName,
-  id,
+  fields,
 }: {
   email: string
   firstName: string
-  id: string
+  fields: Record<string, string>
 }) {
   const subscriber = await getConvertKitSubscriber(email)
   const kcdTagId = '2466369'
@@ -148,7 +148,7 @@ async function tagKCDSiteSubscriber({
     api_secret: CONVERT_KIT_API_SECRET,
     first_name: firstName,
     email,
-    fields: {kcd_site_id: id},
+    fields,
   }
   // the main difference in subscribing to a tag and subscribing to a
   // form is that in the form's case, the user will get a double opt-in
@@ -159,7 +159,7 @@ async function tagKCDSiteSubscriber({
     ? `https://api.convertkit.com/v3/tags/${kcdTagId}/subscribe`
     : `https://api.convertkit.com/v3/forms/${kcdSiteForm}/subscribe`
   const updatedRes = await fetch(subscribeUrl, {
-    method: 'post',
+    method: 'POST',
     body: JSON.stringify(subscriberData),
     headers: {
       'Content-Type': 'application/json',

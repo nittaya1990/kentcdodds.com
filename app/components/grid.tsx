@@ -1,23 +1,25 @@
+import {clsx} from 'clsx'
 import * as React from 'react'
-import clsx from 'clsx'
 
 interface GridProps {
   children: React.ReactNode
   overflow?: boolean
   className?: string
   as?: React.ElementType
+  id?: string
   nested?: boolean
   rowGap?: boolean
   featured?: boolean
 }
 
 const Grid = React.forwardRef<HTMLElement, GridProps>(function Grid(
-  {children, className, as: Tag = 'div', featured, nested, rowGap},
+  {children, className, as: Tag = 'div', featured, nested, rowGap, id},
   ref,
 ) {
   return (
     <Tag
       ref={ref}
+      id={id}
       className={clsx('relative', {
         'mx-10vw': !nested,
         'w-full': nested,

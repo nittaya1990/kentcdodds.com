@@ -1,9 +1,16 @@
 // try to keep this dep-free so we don't have to install deps
-const {getChangedFiles, fetchJson} = require('./get-changed-files')
+import {getChangedFiles, fetchJson} from './get-changed-files.js'
 const [currentCommitSha] = process.argv.slice(2)
 
+const baseUrl =
+  process.env.GITHUB_REF_NAME === 'dev'
+    ? 'https://kcd-staging.fly.dev'
+    : 'https://kentcdodds.com'
+
 async function go() {
-  const buildInfo = await fetchJson('https://kentcdodds.com/build/info.json')
+  const buildInfo = await fetchJson(`${baseUrl}/build/info.json`, {
+    timoutTime: 10_000,
+  })
   const compareCommitSha = buildInfo.commit.sha
   const changedFiles = await getChangedFiles(currentCommitSha, compareCommitSha)
   console.error('Determining whether the changed files are deployable', {

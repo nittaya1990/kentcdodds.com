@@ -1,10 +1,10 @@
 // try to keep this dep-free so we don't have to install deps
-const execSync = require('child_process').execSync
-const https = require('https')
+import {execSync} from 'child_process'
+import https from 'https'
 
-function fetchJson(url) {
+export function fetchJson(url, {timoutTime} = {}) {
   return new Promise((resolve, reject) => {
-    https
+    const request = https
       .get(url, res => {
         let data = ''
         res.on('data', d => {
@@ -22,6 +22,11 @@ function fetchJson(url) {
       .on('error', e => {
         reject(e)
       })
+    if (timoutTime) {
+      setTimeout(() => {
+        request.destroy(new Error('Request timed out'))
+      }, timoutTime)
+    }
   })
 }
 
@@ -32,7 +37,7 @@ const changeTypes = {
   R: 'moved',
 }
 
-async function getChangedFiles(currentCommitSha, compareCommitSha) {
+export async function getChangedFiles(currentCommitSha, compareCommitSha) {
   try {
     const lineParser = /^(?<change>\w).*?\s+(?<filename>.+$)/
     const gitOutput = execSync(
@@ -57,5 +62,3 @@ async function getChangedFiles(currentCommitSha, compareCommitSha) {
     return null
   }
 }
-
-module.exports = {getChangedFiles, fetchJson}

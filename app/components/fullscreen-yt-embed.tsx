@@ -1,7 +1,6 @@
-import Dialog from '@reach/dialog'
+import {Dialog} from '@reach/dialog'
 import * as React from 'react'
-import {PlayIcon} from './icons/play-icon'
-import {PlusIcon} from './icons/plus-icon'
+import {PlayIcon, PlusIcon} from './icons.tsx'
 
 function YouTubeEmbed({
   onCloseClick,
@@ -23,7 +22,7 @@ function YouTubeEmbed({
       <button
         aria-label="close video"
         onClick={onCloseClick}
-        className="focus:outline-none absolute right-4 top-8 z-50 rotate-45 transform text-white hover:scale-150 focus:scale-150"
+        className="absolute right-4 top-8 z-50 rotate-45 transform text-white hover:scale-150 focus:scale-150 focus:outline-none"
       >
         <PlusIcon />
       </button>
@@ -61,7 +60,10 @@ function FullScreenYouTubeEmbed({
       </Dialog>
 
       {showPlayer ? null : (
-        <button className="group relative" onClick={() => setShowPlayer(true)}>
+        <button
+          className="group relative w-full"
+          onClick={() => setShowPlayer(true)}
+        >
           {img}
           <span className="absolute left-0 top-0 h-full w-full">
             <span className="flex h-full w-full items-center justify-center">
@@ -76,8 +78,16 @@ function FullScreenYouTubeEmbed({
   )
 }
 
+/**
+ *  in order to prevent this error when running native ESM in production
+ *  TypeError: Unknown file extension ".jsx" for
+ *  kentcdodds.com/node_modules/react-lite-youtube-embed/dist/index.es.jsx
+ *
+ *  we import it here from 'react-lite-youtube-embed/dist/index.es.jsx' and add
+ *  it to serverDependenciesToBundle in remix.config.js
+ */
+export {default as LiteYouTubeEmbed} from 'react-lite-youtube-embed/dist/index.es.jsx'
 export {FullScreenYouTubeEmbed}
-export {default as LiteYouTubeEmbed} from 'react-lite-youtube-embed'
 
 export const links = () => {
   // for the youtube embed

@@ -1,11 +1,11 @@
+import {slugifyWithCounter, type CountableSlugify} from '@sindresorhus/slugify'
 import * as YAML from 'yaml'
-import type {CountableSlugify} from '@sindresorhus/slugify'
-import type {Await} from '~/types'
-import {typedBoolean} from '~/utils/misc'
-import {markdownToHtml, stripHtml} from '~/utils/markdown.server'
-import {downloadFile} from '~/utils/github.server'
-import {cachified} from '~/utils/cache.server'
-import {redisCache} from '~/utils/redis.server'
+import {type Await} from '~/types.ts'
+import {cache, cachified} from '~/utils/cache.server.ts'
+import {downloadFile} from '~/utils/github.server.ts'
+import {markdownToHtml, stripHtml} from '~/utils/markdown.server.ts'
+import {formatDate, typedBoolean} from '~/utils/misc.tsx'
+import {type Timings} from './timing.server.ts'
 
 type RawTalk = {
   title?: string
@@ -24,8 +24,6 @@ let _slugify: CountableSlugify
 async function getSlugify() {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!_slugify) {
-    const {slugifyWithCounter} = await import('@sindresorhus/slugify')
-
     _slugify = slugifyWithCounter()
   }
   return _slugify
@@ -46,17 +44,21 @@ async function getTalk(rawTalk: RawTalk, allTags: Array<string>) {
       : [],
     descriptionHTML,
     description: descriptionHTML ? await stripHtml(descriptionHTML) : '',
-    deliveries: rawTalk.deliveries
+    deliveries: (rawTalk.deliveries
       ? await Promise.all(
           rawTalk.deliveries.map(async d => {
             return {
               eventHTML: d.event ? await markdownToHtml(d.event) : undefined,
               date: d.date,
               recording: d.recording,
+              dateDisplay: d.date ? formatDate(d.date) : 'TBA',
             }
           }),
         )
-      : [],
+      : []
+    ).sort((a, b) => {
+      return a.date && b.date ? (moreRecent(a.date, b.date) ? -1 : 1) : 0
+    }),
   }
 }
 
@@ -107,18 +109,23 @@ function getTags(talks: Array<RawTalk>): string[] {
 async function getTalksAndTags({
   request,
   forceFresh,
+  timings,
 }: {
   request?: Request
   forceFresh?: boolean
+  timings?: Timings
 }) {
   const slugify = await getSlugify()
   slugify.reset()
 
+  const key = 'content:data:talks.yml'
   const talks = await cachified({
-    cache: redisCache,
-    key: 'content:data:talks.yml',
-    maxAge: 1000 * 60 * 60 * 24 * 14,
+    cache,
     request,
+    timings,
+    key,
+    ttl: 1000 * 60 * 60 * 24 * 14,
+    staleWhileRevalidate: 1000 * 60 * 60 * 24 * 30,
     forceFresh,
     getFreshValue: async () => {
       const talksString = await downloadFile('content/data/talks.yml')

@@ -1,14 +1,14 @@
-import * as React from 'react'
-import type {KCDHandle} from '~/types'
-import {HeroSection} from '~/components/sections/hero-section'
-import {images} from '~/images'
+import {type MetaFunction} from '@remix-run/node'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {images} from '~/images.tsx'
+import {type KCDHandle} from '~/types.ts'
 
 export const handle: KCDHandle = {
   getSitemapEntries: () => null,
 }
 
-export function meta() {
-  return {title: "Ain't nothing here"}
+export const meta: MetaFunction = () => {
+  return [{title: "Ain't nothing here"}]
 }
 
 export default function NotFoundPage() {

@@ -1,43 +1,35 @@
-import * as React from 'react'
-import type {LoaderFunction, HeadersFunction, MetaFunction} from 'remix'
-import {Link, json, useLoaderData, useSearchParams} from 'remix'
-import clsx from 'clsx'
 import {MixedCheckbox} from '@reach/checkbox'
-import type {Await, KCDHandle, MdxListItem, Team} from '~/types'
-import {useRootData} from '~/utils/use-root-data'
-import {Grid} from '~/components/grid'
+import {
+  json,
+  type DataFunctionArgs,
+  type HeadersFunction,
+  type LinksFunction,
+  type MetaFunction,
+  type SerializeFrom,
+} from '@remix-run/node'
+import {Link, useLoaderData, useSearchParams} from '@remix-run/react'
+import {clsx} from 'clsx'
+import * as React from 'react'
+import {ArrowLink} from '~/components/arrow-button.tsx'
+import {ArticleCard} from '~/components/article-card.tsx'
+import {Button} from '~/components/button.tsx'
+import {ServerError} from '~/components/errors.tsx'
+import {Grid} from '~/components/grid.tsx'
+import {PlusIcon, RssIcon, SearchIcon} from '~/components/icons.tsx'
+import {FeaturedSection} from '~/components/sections/featured-section.tsx'
+import {HeroSection} from '~/components/sections/hero-section.tsx'
+import {Spacer} from '~/components/spacer.tsx'
+import {Tag} from '~/components/tag.tsx'
+import {TeamStats} from '~/components/team-stats.tsx'
+import {H2, H3, H6, Paragraph} from '~/components/typography.tsx'
 import {
   getImageBuilder,
   getImgProps,
   getSocialImageWithPreTitle,
   images,
-} from '~/images'
-import {H2, H3, H6, Paragraph} from '~/components/typography'
-import {SearchIcon} from '~/components/icons/search-icon'
-import {ArticleCard} from '~/components/article-card'
-import {ArrowLink} from '~/components/arrow-button'
-import {FeaturedSection} from '~/components/sections/featured-section'
-import {Tag} from '~/components/tag'
-import {getBlogMdxListItems, getBannerAltProp} from '~/utils/mdx'
-import {filterPosts, getRankingLeader} from '~/utils/blog'
-import {HeroSection} from '~/components/sections/hero-section'
-import {PlusIcon} from '~/components/icons/plus-icon'
-import {Button} from '~/components/button'
-import type {Timings} from '~/utils/metrics.server'
-import {getServerTimeHeader} from '~/utils/metrics.server'
-import {ServerError} from '~/components/errors'
-import {
-  formatAbbreviatedNumber,
-  formatDate,
-  formatNumber,
-  getDisplayUrl,
-  getUrl,
-  isTeam,
-  reuseUsefulLoaderHeaders,
-  useUpdateQueryStringValueWithoutNavigation,
-} from '~/utils/misc'
-import {TeamStats} from '~/components/team-stats'
-import {Spacer} from '~/components/spacer'
+} from '~/images.tsx'
+import {type KCDHandle, type Team} from '~/types.ts'
+import {filterPosts, getRankingLeader} from '~/utils/blog.ts'
 import {
   getAllBlogPostReadRankings,
   getBlogReadRankings,
@@ -45,12 +37,24 @@ import {
   getReaderCount,
   getSlugReadsByUser,
   getTotalPostReads,
-  ReadRankings,
-} from '~/utils/blog.server'
-import {useTeam} from '~/utils/team-provider'
-import type {LoaderData as RootLoaderData} from '../root'
-import {getSocialMetas} from '~/utils/seo'
-import {RssIcon} from '~/components/icons/rss-icon'
+} from '~/utils/blog.server.ts'
+import {getBannerAltProp} from '~/utils/mdx.tsx'
+import {getBlogMdxListItems} from '~/utils/mdx.server.ts'
+import {
+  formatAbbreviatedNumber,
+  formatNumber,
+  getDisplayUrl,
+  getUrl,
+  isTeam,
+  reuseUsefulLoaderHeaders,
+  useUpdateQueryStringValueWithoutNavigation,
+  useCapturedRouteError,
+} from '~/utils/misc.tsx'
+import {getSocialMetas} from '~/utils/seo.ts'
+import {useTeam} from '~/utils/team-provider.tsx'
+import {getServerTimeHeader} from '~/utils/timing.server.ts'
+import {useRootData} from '~/utils/use-root-data.ts'
+import {type RootLoaderType} from '~/root.tsx'
 
 const handleId = 'blog'
 export const handle: KCDHandle = {
@@ -58,21 +62,19 @@ export const handle: KCDHandle = {
   getSitemapEntries: () => [{route: `/blog`, priority: 0.7}],
 }
 
-type LoaderData = {
-  posts: Array<MdxListItem>
-  recommended: MdxListItem | undefined
-  tags: Array<string>
-  allPostReadRankings: Record<string, ReadRankings>
-  readRankings: ReadRankings
-  totalReads: string
-  totalBlogReaders: string
-  overallLeadingTeam: Team | null
-  userReads: Await<ReturnType<typeof getSlugReadsByUser>>
+export const links: LinksFunction = () => {
+  return [
+    {
+      rel: 'alternate',
+      type: 'application/rss+xml',
+      title: 'Kent C. Dodds Blog',
+      href: '/blog/rss.xml',
+    },
+  ]
 }
 
-export const loader: LoaderFunction = async ({request}) => {
-  const timings: Timings = {}
-
+export async function loader({request}: DataFunctionArgs) {
+  const timings = {}
   const [
     posts,
     [recommended],
@@ -82,15 +84,15 @@ export const loader: LoaderFunction = async ({request}) => {
     allPostReadRankings,
     userReads,
   ] = await Promise.all([
-    getBlogMdxListItems({request, timings}).then(allPosts =>
+    getBlogMdxListItems({request}).then(allPosts =>
       allPosts.filter(p => !p.frontmatter.draft),
     ),
-    getBlogRecommendations(request, {limit: 1}),
-    getBlogReadRankings({request}),
-    getTotalPostReads(request),
-    getReaderCount(request),
-    getAllBlogPostReadRankings({request}),
-    getSlugReadsByUser(request),
+    getBlogRecommendations({request, limit: 1, timings}),
+    getBlogReadRankings({request, timings}),
+    getTotalPostReads({request, timings}),
+    getReaderCount({request, timings}),
+    getAllBlogPostReadRankings({request, timings}),
+    getSlugReadsByUser({request, timings}),
   ])
 
   const tags = new Set<string>()
@@ -100,7 +102,7 @@ export const loader: LoaderFunction = async ({request}) => {
     }
   }
 
-  const data: LoaderData = {
+  const data = {
     posts,
     recommended,
     readRankings,
@@ -123,29 +125,28 @@ export const loader: LoaderFunction = async ({request}) => {
 
 export const headers: HeadersFunction = reuseUsefulLoaderHeaders
 
-export const meta: MetaFunction = ({data, parentsData}) => {
-  const {requestInfo} = parentsData.root as RootLoaderData
-  const {totalBlogReaders, posts} = data as LoaderData
-
-  return {
-    ...getSocialMetas({
-      origin: requestInfo.origin,
-      title: 'The Kent C. Dodds Blog',
-      description: `Join ${totalBlogReaders} people who have read Kent's ${formatNumber(
-        posts.length,
-      )} articles on JavaScript, TypeScript, React, Testing, Career, and more.`,
-      keywords:
-        'JavaScript, TypeScript, React, Testing, Career, Software Development, Kent C. Dodds Blog',
-      url: getUrl(requestInfo),
-      image: getSocialImageWithPreTitle({
-        origin: requestInfo.origin,
-        url: getDisplayUrl(requestInfo),
-        featuredImage: images.skis.id,
-        preTitle: 'Check out this Blog',
-        title: `Priceless insights, ideas, and experiences for your dev work`,
-      }),
+export const meta: MetaFunction<typeof loader, {root: RootLoaderType}> = ({
+  data,
+  matches,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const requestInfo = matches.find(m => m.id === 'root')?.data.requestInfo
+  const {totalBlogReaders, posts} = data as SerializeFrom<typeof loader>
+  return getSocialMetas({
+    title: 'The Kent C. Dodds Blog',
+    description: `Join ${totalBlogReaders} people who have read Kent's ${formatNumber(
+      posts.length,
+    )} articles on JavaScript, TypeScript, React, Testing, Career, and more.`,
+    keywords:
+      'JavaScript, TypeScript, React, Testing, Career, Software Development, Kent C. Dodds Blog',
+    url: getUrl(requestInfo),
+    image: getSocialImageWithPreTitle({
+      url: getDisplayUrl(requestInfo),
+      featuredImage: images.skis.id,
+      preTitle: 'Check out this Blog',
+      title: `Priceless insights, ideas, and experiences for your dev work`,
     }),
-  }
+  })
 }
 
 // should be divisible by 3 and 2 (large screen, and medium screen).
@@ -179,7 +180,7 @@ function BlogHome() {
 
   useUpdateQueryStringValueWithoutNavigation('q', query)
 
-  const data = useLoaderData<LoaderData>()
+  const data = useLoaderData<typeof loader>()
   const {posts: allPosts, userReads} = data
 
   const getLeadingTeamForSlug = React.useCallback(
@@ -304,6 +305,8 @@ function BlogHome() {
       )
     : new Set(data.tags)
 
+  // this is a remix bug
+  // eslint-disable-next-line
   const recommendedPermalink = data.recommended
     ? `${requestInfo.origin}/blog/${data.recommended.slug}`
     : undefined
@@ -368,7 +371,7 @@ function BlogHome() {
                     ignoreInputKeyUp.current = false
                   }}
                   className={clsx(
-                    'absolute left-6 top-0 flex h-full items-center justify-center border-none bg-transparent p-0 text-blueGray-500',
+                    'absolute left-6 top-0 flex h-full items-center justify-center border-none bg-transparent p-0 text-slate-500',
                     {
                       'cursor-pointer': query !== '',
                       'cursor-default': query === '',
@@ -395,9 +398,9 @@ function BlogHome() {
                   }}
                   name="q"
                   placeholder={searchInputPlaceholder}
-                  className="appearance-none text-primary bg-primary border-secondary focus:bg-secondary focus:outline-none w-full rounded-full border py-6 pl-14 pr-6 text-lg font-medium hover:border-team-current focus:border-team-current md:pr-24"
+                  className="text-primary bg-primary border-secondary focus:bg-secondary w-full appearance-none rounded-full border py-6 pl-14 pr-6 text-lg font-medium hover:border-team-current focus:border-team-current focus:outline-none md:pr-24"
                 />
-                <div className="absolute right-6 top-0 hidden h-full w-14 items-center justify-between text-lg font-medium text-blueGray-500 md:flex">
+                <div className="absolute right-6 top-0 hidden h-full w-14 items-center justify-between text-lg font-medium text-slate-500 md:flex">
                   <MixedCheckbox
                     title={checkboxLabel}
                     aria-label={checkboxLabel}
@@ -490,7 +493,9 @@ function BlogHome() {
                     tag={tag}
                     selected={selected}
                     onClick={() => toggleTag(tag)}
-                    disabled={!visibleTags.has(tag) && !selected}
+                    disabled={
+                      Boolean(!visibleTags.has(tag)) ? !selected : false
+                    }
                   />
                 )
               })}
@@ -499,16 +504,17 @@ function BlogHome() {
         ) : null}
       </Grid>
 
+      {/* this is a remix bug */}
+      {/* eslint-disable-next-line */}
       {!isSearching && data.recommended ? (
         <div className="mb-10">
           <FeaturedSection
-            subTitle={
-              data.recommended.frontmatter.date
-                ? `${formatDate(data.recommended.frontmatter.date)} — ${
-                    data.recommended.readTime?.text ?? 'quick read'
-                  }`
-                : 'TBA'
-            }
+            subTitle={[
+              data.recommended.dateDisplay,
+              data.recommended.readTime?.text ?? 'quick read',
+            ]
+              .filter(Boolean)
+              .join(' — ')}
             title={data.recommended.frontmatter.title}
             blurDataUrl={data.recommended.frontmatter.bannerBlurDataUrl}
             imageBuilder={
@@ -532,8 +538,8 @@ function BlogHome() {
         {posts.length === 0 ? (
           <div className="col-span-full flex flex-col items-center">
             <img
-              className="mt-24 h-auto w-full max-w-lg"
               {...getImgProps(images.bustedOnewheel, {
+                className: 'mt-24 h-auto w-full max-w-lg',
                 widths: [350, 512, 1024, 1536],
                 sizes: ['(max-width: 639px) 80vw', '512px'],
               })}
@@ -595,8 +601,8 @@ function BlogHome() {
 }
 
 export default BlogHome
-
-export function ErrorBoundary({error}: {error: Error}) {
+export function ErrorBoundary() {
+  const error = useCapturedRouteError()
   console.error(error)
   return <ServerError />
 }

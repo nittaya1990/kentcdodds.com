@@ -1,9 +1,9 @@
 // This just allows us to track individual clients so we can keep track of
 // the posts they've read and make useful suggestions even if they're not logged in.
 
-import {createCookieSessionStorage} from 'remix'
+import {createCookieSessionStorage} from '@remix-run/node'
 import * as uuid from 'uuid'
-import {getRequiredServerEnvVar} from './misc'
+import {getRequiredServerEnvVar} from './misc.tsx'
 
 const clientStorage = createCookieSessionStorage({
   cookie: {
@@ -12,21 +12,34 @@ const clientStorage = createCookieSessionStorage({
     secrets: [getRequiredServerEnvVar('SESSION_SECRET')],
     sameSite: 'lax',
     path: '/',
-    // no client ID for you on my 100th birthday! 😂
-    expires: new Date('2088-10-18'),
     httpOnly: true,
   },
 })
 
-async function getClientSession(request: Request) {
+async function getClientSession(request: Request, user: {} | null) {
   const session = await clientStorage.getSession(request.headers.get('Cookie'))
-  const initialValue = await clientStorage.commitSession(session)
+
+  // no client ID for you on my 100th birthday! 😂
+  const expires = new Date('2088-10-18')
+  const initialValue = user
+    ? null
+    : await clientStorage.commitSession(session, {expires})
   async function commit() {
-    const currentValue = await clientStorage.commitSession(session)
-    return currentValue === initialValue ? null : currentValue
+    if (user) {
+      if (initialValue) {
+        const value = await clientStorage.destroySession(session)
+        return value
+      } else {
+        return null
+      }
+    } else {
+      const currentValue = await clientStorage.commitSession(session, {expires})
+      return currentValue === initialValue ? null : currentValue
+    }
   }
 
   function getClientId() {
+    if (user) return null
     let clientId = session.get('clientId') as string | undefined
     if (typeof clientId === 'string') return clientId
     clientId = uuid.v4()
@@ -40,6 +53,9 @@ async function getClientSession(request: Request) {
   return {
     getClientId,
     commit,
+    setUser(usr: {} | null) {
+      user = usr
+    },
     /**
      * This will initialize a Headers object if one is not provided.
      * It will set the 'Set-Cookie' header value on that headers object.
